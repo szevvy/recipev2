@@ -1,22 +1,27 @@
+import Link from "next/link";
+import { AppHeader } from "@/components/AppHeader";
+import { ChefHat } from "lucide-react";
+
 export default function HomePage() {
   return (
-    <main className="min-h-screen p-8 max-w-4xl mx-auto space-y-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Recipe Planner</h1>
-        <form action="/logout" method="post">
-          <button
-            type="submit"
-            className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-          >
-            Sign out
-          </button>
-        </form>
-      </header>
-
-      <section className="rounded-xl border border-black/10 dark:border-white/10 p-6 bg-white dark:bg-neutral-900">
-        <p className="text-neutral-600 dark:text-neutral-400">
-          Phase 1 scaffold is live. Up next: ingredients, recipes, meal plan, shopping list.
+    <main className="min-h-screen p-6 max-w-4xl mx-auto">
+      <AppHeader current="/" />
+      <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-8 shadow-sm">
+        <div className="flex items-center gap-3 mb-3">
+          <ChefHat className="text-[var(--accent)]" size={32} />
+          <h1 className="text-3xl font-serif text-[var(--foreground)]">Welcome home</h1>
+        </div>
+        <p className="text-[var(--muted)] mb-6 max-w-prose">
+          Build out your ingredient library, then recipes and the shopping list follow.
         </p>
+        <div className="flex gap-3">
+          <Link
+            href="/ingredients"
+            className="inline-flex items-center rounded-full bg-[var(--accent)] text-white text-sm px-4 py-2 hover:bg-[var(--accent-hover)] transition-colors"
+          >
+            Manage ingredients
+          </Link>
+        </div>
       </section>
     </main>
   );

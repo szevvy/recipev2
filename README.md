@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Recipe Planner
 
-## Getting Started
+Household meal planner + shopping list, built on Next.js + Supabase.
+Protected by a single shared password; cookie keeps you signed in for a year.
 
-First, run the development server:
+## First-time setup
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. **Supabase project**
+   - Create a project at https://supabase.com (free tier)
+   - In the SQL editor, run [supabase/schema.sql](supabase/schema.sql)
+   - In Project Settings → API, copy:
+     - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
+     - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY` (**never expose to the browser**)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. **Secrets**
+   ```
+   npm run gen-password   # type the shared password → prints APP_PASSWORD_HASH
+   npm run gen-secret     # prints AUTH_SECRET
+   ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. **Env file**
+   - Copy `.env.example` to `.env.local` and paste the four values in.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. **Run**
+   ```
+   npm run dev
+   ```
+   Visit http://localhost:3000 — you'll be redirected to `/login`.
 
-## Learn More
+## Deploy (Vercel)
 
-To learn more about Next.js, take a look at the following resources:
+- Push this repo to GitHub.
+- Import it at https://vercel.com/new.
+- Add the four env vars from `.env.local` to the Vercel project.
+- Deploy. Done.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 16 (App Router) + TypeScript + Tailwind
+- Supabase Postgres (service_role key, server-side only)
+- Password-cookie auth: bcrypt hash in env + HMAC-signed cookie

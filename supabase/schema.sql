@@ -88,6 +88,15 @@ create trigger ingredients_set_updated_at before update on ingredients
 create trigger recipes_set_updated_at before update on recipes
   for each row execute function set_updated_at();
 
+-- Household-wide settings. Single-row table.
+-- week_starts_on: 0 = Sunday, 1 = Monday (ISO default).
+create table app_settings (
+  id int primary key default 1 check (id = 1),
+  week_starts_on int not null default 1 check (week_starts_on between 0 and 6),
+  updated_at timestamptz not null default now()
+);
+insert into app_settings (id) values (1) on conflict do nothing;
+
 -- Lock down direct client access. All reads/writes go through the server
 -- (service_role key) after the shared-password cookie check in middleware.
 alter table ingredients enable row level security;
@@ -95,3 +104,4 @@ alter table recipes enable row level security;
 alter table recipe_ingredients enable row level security;
 alter table meal_plan enable row level security;
 alter table shopping_items enable row level security;
+alter table app_settings enable row level security;

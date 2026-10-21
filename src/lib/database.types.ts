@@ -1,8 +1,10 @@
 import type {
+  AppSettings,
   Ingredient,
   Recipe,
   RecipeIngredient,
   StapleState,
+  WeekStart,
 } from "./types";
 
 type IngredientInsert = {
@@ -58,6 +60,12 @@ export type Database = {
         Row: RecipeIngredient;
         Insert: RecipeIngredientInsert;
         Update: Partial<RecipeIngredientInsert>;
+        Relationships: [];
+      };
+      app_settings: {
+        Row: AppSettings;
+        Insert: { id?: number; week_starts_on?: WeekStart };
+        Update: { week_starts_on?: WeekStart };
         Relationships: [];
       };
     };

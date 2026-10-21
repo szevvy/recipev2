@@ -37,3 +37,11 @@ export type RecipeIngredient = {
 export type RecipeWithIngredients = Recipe & {
   recipe_ingredients: (RecipeIngredient & { ingredients: Pick<Ingredient, "id" | "name"> })[];
 };
+
+export type WeekStart = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export type AppSettings = {
+  id: number;
+  week_starts_on: WeekStart;
+  updated_at: string;
+};

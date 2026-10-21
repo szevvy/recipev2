@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { HeaderMenu } from "./HeaderMenu";
 
 const navItems: { href: string; label: string; disabled?: boolean }[] = [
   { href: "/", label: "Home" },
@@ -46,16 +46,7 @@ export function AppHeader({ current }: { current: string }) {
           })}
         </nav>
       </div>
-      <form action="/logout" method="post">
-        <button
-          type="submit"
-          className="inline-flex items-center gap-1.5 text-sm text-[var(--muted)] hover:text-[var(--foreground)]"
-          title="Sign out"
-        >
-          <LogOut size={16} />
-          <span className="hidden sm:inline">Sign out</span>
-        </button>
-      </form>
+      <HeaderMenu />
     </header>
   );
 }

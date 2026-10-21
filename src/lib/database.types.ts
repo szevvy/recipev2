@@ -1,15 +1,43 @@
-import type { Ingredient, StapleState } from "./types";
+import type {
+  Ingredient,
+  Recipe,
+  RecipeIngredient,
+  StapleState,
+} from "./types";
 
 type IngredientInsert = {
   id?: string;
   name: string;
-  default_unit?: string | null;
   group_name?: string | null;
   is_staple?: boolean;
   staple_state?: StapleState;
 };
 
 type IngredientUpdate = Partial<Omit<Ingredient, "id" | "created_at" | "updated_at">>;
+
+type RecipeInsert = {
+  id?: string;
+  name: string;
+  instructions?: string | null;
+  source_url?: string | null;
+  default_servings?: number;
+  prep_minutes?: number | null;
+  cook_minutes?: number | null;
+  image_url?: string | null;
+  notes?: string | null;
+};
+
+type RecipeUpdate = Partial<Omit<Recipe, "id" | "created_at" | "updated_at">>;
+
+type RecipeIngredientInsert = {
+  id?: string;
+  recipe_id: string;
+  ingredient_id: string;
+  qty: number;
+  unit?: string | null;
+  note?: string | null;
+  sort_order?: number;
+};
 
 export type Database = {
   public: {
@@ -18,6 +46,18 @@ export type Database = {
         Row: Ingredient;
         Insert: IngredientInsert;
         Update: IngredientUpdate;
+        Relationships: [];
+      };
+      recipes: {
+        Row: Recipe;
+        Insert: RecipeInsert;
+        Update: RecipeUpdate;
+        Relationships: [];
+      };
+      recipe_ingredients: {
+        Row: RecipeIngredient;
+        Insert: RecipeIngredientInsert;
+        Update: Partial<RecipeIngredientInsert>;
         Relationships: [];
       };
     };

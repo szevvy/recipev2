@@ -67,7 +67,7 @@ export function IngredientRow({
     return (
       <li className="rounded-xl bg-[var(--accent-soft)]/60 p-3 ring-1 ring-[var(--accent)]/30">
         <form action={onSave} className="space-y-2">
-          <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1.5fr_auto] gap-2 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-[2fr_1.5fr_auto] gap-2 items-end">
             <label className="block">
               <span className="text-xs text-[var(--muted)]">Name</span>
               <input
@@ -75,15 +75,6 @@ export function IngredientRow({
                 defaultValue={ingredient.name}
                 required
                 maxLength={80}
-                className="mt-0.5 w-full rounded-lg border border-[var(--border)] bg-white px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs text-[var(--muted)]">Unit</span>
-              <input
-                name="default_unit"
-                defaultValue={ingredient.default_unit ?? ""}
-                maxLength={20}
                 className="mt-0.5 w-full rounded-lg border border-[var(--border)] bg-white px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
               />
             </label>
@@ -131,9 +122,6 @@ export function IngredientRow({
       <StarButton active={ingredient.is_staple} onToggle={onToggleStaple} disabled={pending} />
       <div className="flex-1 min-w-0">
         <div className="font-medium text-[var(--foreground)] truncate">{ingredient.name}</div>
-        {ingredient.default_unit && (
-          <div className="text-xs text-[var(--muted)]">{ingredient.default_unit}</div>
-        )}
       </div>
       {error && <span className="text-xs text-red-600 mr-1">{error}</span>}
       <button

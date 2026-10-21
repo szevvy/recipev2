@@ -20,7 +20,6 @@ export async function createIngredientAction(fd: FormData): Promise<ActionResult
     const input = parseIngredientForm(fd);
     const { error } = await supabaseAdmin().from("ingredients").insert({
       name: input.name,
-      default_unit: input.default_unit,
       group_name: input.group_name,
       is_staple: input.is_staple,
     });
@@ -42,7 +41,6 @@ export async function updateIngredientAction(id: string, fd: FormData): Promise<
       .from("ingredients")
       .update({
         name: input.name,
-        default_unit: input.default_unit,
         group_name: input.group_name,
         is_staple: input.is_staple,
       })

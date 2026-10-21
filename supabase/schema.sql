@@ -4,10 +4,10 @@
 create extension if not exists pgcrypto;
 
 -- Ingredients. Groups are derived from the distinct `group_name` values.
+-- Units are specified per recipe row, not here.
 create table ingredients (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
-  default_unit text,
   group_name text,
   is_staple boolean not null default false,
   staple_state text not null default 'not_checked'
@@ -25,6 +25,9 @@ create table recipes (
   instructions text,
   source_url text,
   default_servings numeric not null default 4 check (default_servings > 0),
+  prep_minutes int check (prep_minutes is null or prep_minutes >= 0),
+  cook_minutes int check (cook_minutes is null or cook_minutes >= 0),
+  image_url text,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

@@ -34,22 +34,13 @@ export function AddIngredientForm({ groupSuggestions }: { groupSuggestions: stri
       <h2 className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">
         Add ingredient
       </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1.5fr_auto_auto] gap-2 items-end">
+      <div className="grid grid-cols-1 sm:grid-cols-[2fr_1.5fr_auto_auto] gap-2 items-end">
         <label className="block">
           <span className="text-xs text-[var(--muted)]">Name</span>
           <input
             name="name"
             required
             maxLength={80}
-            className="mt-0.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs text-[var(--muted)]">Unit</span>
-          <input
-            name="default_unit"
-            maxLength={20}
-            placeholder="g, cup, …"
             className="mt-0.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
           />
         </label>

@@ -75,7 +75,7 @@ export default async function RecipeViewPage({ params }: { params: Params }) {
       <article className="rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-sm overflow-hidden">
         {r.image_url && (
           <div
-            className="h-56 sm:h-72 bg-cover bg-center"
+            className="h-32 sm:h-40 bg-cover bg-center"
             style={{ backgroundImage: `url(${r.image_url})` }}
           />
         )}

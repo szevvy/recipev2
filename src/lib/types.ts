@@ -34,6 +34,19 @@ export type RecipeIngredient = {
   sort_order: number;
 };
 
+export type MealPlanEntry = {
+  id: string;
+  date: string;
+  recipe_id: string;
+  servings: number | null;
+  slot: string | null;
+  created_at: string;
+};
+
+export type MealPlanWithRecipe = MealPlanEntry & {
+  recipes: Pick<Recipe, "id" | "name" | "default_servings" | "image_url"> | null;
+};
+
 export type RecipeWithIngredients = Recipe & {
   recipe_ingredients: (RecipeIngredient & { ingredients: Pick<Ingredient, "id" | "name"> })[];
 };

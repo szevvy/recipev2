@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Pencil, Trash2, Check, X } from "lucide-react";
 import type { Ingredient } from "@/lib/types";
 import { StarButton, StarToggleHidden } from "@/components/StarButton";
@@ -20,8 +20,14 @@ export function IngredientRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [editStaple, setEditStaple] = useState(ingredient.is_staple);
+  const [isStapleLocal, setIsStapleLocal] = useState(ingredient.is_staple);
+  const [deletedLocal, setDeletedLocal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setIsStapleLocal(ingredient.is_staple);
+  }, [ingredient.is_staple]);
 
   function openEdit() {
     setEditStaple(ingredient.is_staple);
@@ -49,19 +55,30 @@ export function IngredientRow({
   function onDelete() {
     if (!confirm(`Delete "${ingredient.name}"?`)) return;
     setError(null);
+    setDeletedLocal(true);
     startTransition(async () => {
       const result = await deleteIngredientAction(ingredient.id);
-      if (!result.ok) setError(result.error);
+      if (!result.ok) {
+        setDeletedLocal(false);
+        setError(result.error);
+      }
     });
   }
 
   function onToggleStaple() {
+    const next = !isStapleLocal;
+    setIsStapleLocal(next);
     setError(null);
     startTransition(async () => {
-      const result = await toggleStapleAction(ingredient.id, !ingredient.is_staple);
-      if (!result.ok) setError(result.error);
+      const result = await toggleStapleAction(ingredient.id, next);
+      if (!result.ok) {
+        setIsStapleLocal(!next);
+        setError(result.error);
+      }
     });
   }
+
+  if (deletedLocal) return null;
 
   if (editing) {
     return (
@@ -119,7 +136,7 @@ export function IngredientRow({
 
   return (
     <li className="flex items-center gap-2 rounded-lg hover:bg-[var(--surface-muted)] px-2 py-1.5 transition-colors">
-      <StarButton active={ingredient.is_staple} onToggle={onToggleStaple} disabled={pending} />
+      <StarButton active={isStapleLocal} onToggle={onToggleStaple} />
       <div className="flex-1 min-w-0">
         <div className="font-medium text-[var(--foreground)] truncate">{ingredient.name}</div>
       </div>

@@ -74,6 +74,5 @@ export async function toggleStapleAction(id: string, isStaple: boolean): Promise
     .update({ is_staple: isStaple })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/ingredients");
   return { ok: true };
 }

@@ -5,7 +5,7 @@ const navItems: { href: string; label: string; disabled?: boolean }[] = [
   { href: "/", label: "Home" },
   { href: "/ingredients", label: "Ingredients" },
   { href: "/recipes", label: "Recipes" },
-  { href: "/plan", label: "Plan", disabled: true },
+  { href: "/plan", label: "Plan" },
   { href: "/shopping", label: "Shopping", disabled: true },
 ];
 

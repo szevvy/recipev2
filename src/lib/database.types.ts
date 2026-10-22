@@ -1,6 +1,7 @@
 import type {
   AppSettings,
   Ingredient,
+  MealPlanEntry,
   Recipe,
   RecipeIngredient,
   StapleState,
@@ -66,6 +67,23 @@ export type Database = {
         Row: AppSettings;
         Insert: { id?: number; week_starts_on?: WeekStart };
         Update: { week_starts_on?: WeekStart };
+        Relationships: [];
+      };
+      meal_plan: {
+        Row: MealPlanEntry;
+        Insert: {
+          id?: string;
+          date: string;
+          recipe_id: string;
+          servings?: number | null;
+          slot?: string | null;
+        };
+        Update: {
+          date?: string;
+          recipe_id?: string;
+          servings?: number | null;
+          slot?: string | null;
+        };
         Relationships: [];
       };
     };

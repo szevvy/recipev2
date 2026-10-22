@@ -10,14 +10,30 @@ export const instant = false;
 type Params = Promise<{ id: string }>;
 
 export default async function RecipeViewPage({ params }: { params: Params }) {
+  const t0 = performance.now();
+  const uptime = process.uptime();
+  const region = process.env.VERCEL_REGION ?? "local";
+
   const { id } = await params;
+  const tParams = performance.now();
   const supabase = supabaseAdmin();
+  const tClient = performance.now();
 
   const { data: recipe, error } = await supabase
     .from("recipes")
     .select("*, recipe_ingredients(*, ingredients(id, name, group_name))")
     .eq("id", id)
     .maybeSingle();
+
+  const tQuery = performance.now();
+  console.log(
+    `[recipe-view] id=${id} region=${region} uptime=${uptime.toFixed(1)}s` +
+      ` params=${(tParams - t0).toFixed(0)}ms` +
+      ` client=${(tClient - tParams).toFixed(0)}ms` +
+      ` query=${(tQuery - tClient).toFixed(0)}ms` +
+      ` total=${(tQuery - t0).toFixed(0)}ms` +
+      ` rows=${(recipe as { recipe_ingredients?: unknown[] } | null)?.recipe_ingredients?.length ?? 0}`,
+  );
 
   if (error) {
     return (

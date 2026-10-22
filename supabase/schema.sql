@@ -33,15 +33,16 @@ create table recipes (
   updated_at timestamptz not null default now()
 );
 
--- Join table of recipe -> ingredient with qty/unit.
+-- Join table of recipe -> ingredient. `quantity` is free text ("500g", "1 1/2 cups",
+-- "2 cloves") and gets parsed at shopping-list-generation time.
 create table recipe_ingredients (
   id uuid primary key default gen_random_uuid(),
   recipe_id uuid not null references recipes(id) on delete cascade,
   ingredient_id uuid not null references ingredients(id) on delete restrict,
-  qty numeric not null check (qty > 0),
-  unit text,
+  quantity text,
   note text,
-  sort_order int not null default 0
+  sort_order int not null default 0,
+  unique (recipe_id, ingredient_id)
 );
 create index recipe_ingredients_recipe_idx on recipe_ingredients (recipe_id);
 create index recipe_ingredients_ingredient_idx on recipe_ingredients (ingredient_id);

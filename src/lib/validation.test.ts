@@ -108,13 +108,13 @@ describe("RecipeInputSchema", () => {
         {
           ingredient_id: "11111111-1111-4111-8111-111111111111",
           ingredient_name: "Flour",
-          qty: 2,
-          unit: "cup",
+          quantity: "2 cups",
           note: null,
         },
       ],
     });
     expect(good.ingredients).toHaveLength(1);
+    expect(good.ingredients[0].quantity).toBe("2 cups");
 
     expect(() =>
       RecipeInputSchema.parse({
@@ -123,23 +123,7 @@ describe("RecipeInputSchema", () => {
           {
             ingredient_id: "not-a-uuid",
             ingredient_name: "Flour",
-            qty: 1,
-            unit: null,
-            note: null,
-          },
-        ],
-      }),
-    ).toThrow();
-
-    expect(() =>
-      RecipeInputSchema.parse({
-        ...base,
-        ingredients: [
-          {
-            ingredient_id: "11111111-1111-4111-8111-111111111111",
-            ingredient_name: "Flour",
-            qty: 0,
-            unit: null,
+            quantity: "1",
             note: null,
           },
         ],
@@ -154,14 +138,28 @@ describe("RecipeInputSchema", () => {
         {
           ingredient_id: null,
           ingredient_name: "Fresh basil",
-          qty: 1,
-          unit: "bunch",
+          quantity: "1 bunch",
           note: null,
         },
       ],
     });
     expect(r.ingredients[0].ingredient_id).toBeNull();
     expect(r.ingredients[0].ingredient_name).toBe("Fresh basil");
+  });
+
+  it("accepts a row with no quantity (blank is fine, user types later)", () => {
+    const r = RecipeInputSchema.parse({
+      ...base,
+      ingredients: [
+        {
+          ingredient_id: null,
+          ingredient_name: "Salt",
+          quantity: "",
+          note: null,
+        },
+      ],
+    });
+    expect(r.ingredients[0].quantity).toBeNull();
   });
 
   it("rejects a row with no name", () => {
@@ -172,8 +170,7 @@ describe("RecipeInputSchema", () => {
           {
             ingredient_id: null,
             ingredient_name: "   ",
-            qty: 1,
-            unit: null,
+            quantity: "1",
             note: null,
           },
         ],

@@ -15,8 +15,7 @@ type Row = {
   tempId: string;
   ingredient_id: string | null;
   ingredient_name: string;
-  qty: string;
-  unit: string;
+  quantity: string;
   note: string;
 };
 
@@ -25,8 +24,7 @@ function emptyRow(): Row {
     tempId: crypto.randomUUID(),
     ingredient_id: null,
     ingredient_name: "",
-    qty: "",
-    unit: "",
+    quantity: "",
     note: "",
   };
 }
@@ -39,8 +37,7 @@ function rowsFromRecipe(recipe: RecipeWithIngredients | null): Row[] {
           tempId: crypto.randomUUID(),
           ingredient_id: ri.ingredient_id,
           ingredient_name: ri.ingredients?.name ?? "",
-          qty: String(ri.qty),
-          unit: ri.unit ?? "",
+          quantity: ri.quantity ?? "",
           note: ri.note ?? "",
         }))
     : [];
@@ -117,8 +114,7 @@ export function RecipeEditor({
       .map((r) => ({
         ingredient_id: r.ingredient_id,
         ingredient_name: r.ingredient_name.trim(),
-        qty: r.qty.trim() ? Number(r.qty) : 1,
-        unit: r.unit.trim() || null,
+        quantity: r.quantity.trim() || null,
         note: r.note.trim() || null,
       }));
 
@@ -240,7 +236,7 @@ export function RecipeEditor({
             return (
               <li
                 key={row.tempId}
-                className="grid grid-cols-1 sm:grid-cols-[2fr_80px_1fr_1.5fr_auto] gap-2 items-start"
+                className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1.5fr_auto] gap-2 items-start"
               >
                 <IngredientPicker
                   ingredients={ingredientsLibrary}
@@ -249,18 +245,10 @@ export function RecipeEditor({
                   placeholder={isLast ? "Add ingredient…" : "Pick an ingredient…"}
                 />
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={row.qty}
-                  onChange={(e) => updateRow(idx, { qty: e.target.value })}
-                  placeholder="1"
-                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
-                />
-                <input
-                  value={row.unit}
-                  onChange={(e) => updateRow(idx, { unit: e.target.value })}
-                  placeholder="unit"
+                  value={row.quantity}
+                  onChange={(e) => updateRow(idx, { quantity: e.target.value })}
+                  placeholder="500g, 1 1/2 cups…"
+                  maxLength={50}
                   className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
                 />
                 <input

@@ -9,22 +9,6 @@ export const instant = false;
 
 type Params = Promise<{ id: string }>;
 
-function formatQty(qty: number): string {
-  const whole = Math.trunc(qty);
-  const frac = qty - whole;
-  const fractions: Record<string, string> = {
-    "0.25": "¼",
-    "0.33": "⅓",
-    "0.5": "½",
-    "0.67": "⅔",
-    "0.75": "¾",
-  };
-  const fracKey = frac.toFixed(2);
-  if (fractions[fracKey]) return whole === 0 ? fractions[fracKey] : `${whole}${fractions[fracKey]}`;
-  if (Number.isInteger(qty)) return String(qty);
-  return String(Number(qty.toFixed(2)));
-}
-
 export default async function RecipeViewPage({ params }: { params: Params }) {
   const { id } = await params;
   const supabase = supabaseAdmin();
@@ -122,10 +106,9 @@ export default async function RecipeViewPage({ params }: { params: Params }) {
                 <ul className="space-y-1.5 text-[var(--foreground)]">
                   {sortedIngredients.map((ri) => (
                     <li key={ri.id} className="leading-snug">
-                      <span className="font-medium">
-                        {formatQty(ri.qty)}
-                        {ri.unit ? ` ${ri.unit}` : ""}
-                      </span>{" "}
+                      {ri.quantity && (
+                        <span className="font-medium">{ri.quantity} </span>
+                      )}
                       <span>{ri.ingredients?.name ?? "(deleted ingredient)"}</span>
                       {ri.note && (
                         <span className="text-[var(--muted)] text-sm">, {ri.note}</span>

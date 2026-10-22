@@ -118,8 +118,7 @@ export async function createRecipeAction(
     const rows = input.ingredients.map((ing, idx) => ({
       recipe_id: recipe.id,
       ingredient_id: resolvedIds[idx],
-      qty: ing.qty,
-      unit: ing.unit,
+      quantity: ing.quantity,
       note: ing.note,
       sort_order: idx,
     }));
@@ -177,8 +176,7 @@ export async function updateRecipeAction(
     const rows = input.ingredients.map((ing, idx) => ({
       recipe_id: id,
       ingredient_id: resolvedIds[idx],
-      qty: ing.qty,
-      unit: ing.unit,
+      quantity: ing.quantity,
       note: ing.note,
       sort_order: idx,
     }));

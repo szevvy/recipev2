@@ -31,8 +31,7 @@ export function parseIngredientForm(fd: FormData): IngredientInput {
 export const RecipeIngredientInputSchema = z.object({
   ingredient_id: z.string().uuid().nullable(),
   ingredient_name: z.string().trim().min(1, "Pick an ingredient").max(80),
-  qty: z.number({ error: "Qty required" }).positive("Qty must be > 0"),
-  unit: trimmedNullable(20),
+  quantity: trimmedNullable(50),
   note: trimmedNullable(100),
 });
 

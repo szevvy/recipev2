@@ -28,8 +28,7 @@ export type RecipeIngredient = {
   id: string;
   recipe_id: string;
   ingredient_id: string;
-  qty: number;
-  unit: string | null;
+  quantity: string | null;
   note: string | null;
   sort_order: number;
 };

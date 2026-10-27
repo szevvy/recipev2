@@ -49,8 +49,6 @@ export default async function ShoppingPage() {
   >;
   const ingredients = (ingredientsResp.data ?? []) as unknown as Ingredient[];
 
-  const anyBought = items.some((i) => i.bought);
-
   // Group by ingredient.group_name
   const byGroup = new Map<string, ShoppingItemWithIngredient[]>();
   for (const item of items) {
@@ -83,7 +81,7 @@ export default async function ShoppingPage() {
             From your meal plan + staples you need. Check off as you go.
           </p>
         </div>
-        <FinishShoppingButton anyBought={anyBought} />
+        <FinishShoppingButton />
       </div>
 
       <StaplePreCheck staples={staples} />

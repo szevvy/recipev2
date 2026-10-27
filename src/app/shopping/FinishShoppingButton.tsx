@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { finishShoppingAction } from "./actions";
 
-export function FinishShoppingButton({ anyBought }: { anyBought: boolean }) {
+export function FinishShoppingButton() {
   const [pending, startTransition] = useTransition();
 
   function onClick() {
@@ -18,8 +18,8 @@ export function FinishShoppingButton({ anyBought }: { anyBought: boolean }) {
     <button
       type="button"
       onClick={onClick}
-      disabled={pending || !anyBought}
-      className="inline-flex items-center gap-1.5 rounded-full bg-[var(--sage)] text-white text-sm px-4 py-2 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+      disabled={pending}
+      className="inline-flex items-center gap-1.5 rounded-full bg-[var(--sage)] text-white text-sm px-4 py-2 hover:brightness-110 disabled:opacity-60 transition-all"
     >
       <CheckCircle2 size={16} /> {pending ? "Finishing…" : "Finish shopping"}
     </button>

@@ -5,8 +5,8 @@ import { syncShoppingList } from "@/lib/shopping-sync";
 import type { Ingredient, ShoppingItemWithIngredient } from "@/lib/types";
 import { AddManualItem } from "./AddManualItem";
 import { FinishShoppingButton } from "./FinishShoppingButton";
+import { HaveSection } from "./HaveSection";
 import { ShoppingItemRow } from "./ShoppingItemRow";
-import { StaplePreCheck } from "./StaplePreCheck";
 
 export const instant = false;
 
@@ -14,53 +14,48 @@ const UNGROUPED = "__ungrouped__";
 
 export default async function ShoppingPage() {
   await connection();
-  // Refresh meal + staple items on each visit.
   await syncShoppingList();
 
   const supabase = supabaseAdmin();
-  const [itemsResp, staplesResp, ingredientsResp] = await Promise.all([
+  const [itemsResp, ingredientsResp] = await Promise.all([
     supabase
       .from("shopping_items")
       .select("*, ingredients(id, name, group_name)")
       .order("created_at"),
-    supabase
-      .from("ingredients")
-      .select("id, name, staple_state")
-      .eq("is_staple", true)
-      .order("name"),
     supabase.from("ingredients").select("*").order("name"),
   ]);
 
-  if (itemsResp.error || staplesResp.error || ingredientsResp.error) {
+  if (itemsResp.error || ingredientsResp.error) {
     return (
       <main className="min-h-screen p-6 max-w-5xl mx-auto">
         <AppHeader current="/shopping" />
         <p className="text-red-600">
           Failed to load shopping list:{" "}
-          {(itemsResp.error ?? staplesResp.error ?? ingredientsResp.error)?.message}
+          {(itemsResp.error ?? ingredientsResp.error)?.message}
         </p>
       </main>
     );
   }
 
   const items = (itemsResp.data ?? []) as unknown as ShoppingItemWithIngredient[];
-  const staples = (staplesResp.data ?? []) as unknown as Array<
-    Pick<Ingredient, "id" | "name" | "staple_state">
-  >;
   const ingredients = (ingredientsResp.data ?? []) as unknown as Ingredient[];
 
-  // Group by ingredient.group_name
+  const active = items.filter((i) => i.state !== "have");
+  const have = items.filter((i) => i.state === "have");
+
+  // Group active items by group_name
   const byGroup = new Map<string, ShoppingItemWithIngredient[]>();
-  for (const item of items) {
+  for (const item of active) {
     const key = item.ingredients?.group_name ?? UNGROUPED;
     const bucket = byGroup.get(key) ?? [];
     bucket.push(item);
     byGroup.set(key, bucket);
   }
-  // Sort within each group: unbought first, then by ingredient name
   for (const bucket of byGroup.values()) {
     bucket.sort((a, b) => {
-      if (a.bought !== b.bought) return a.bought ? 1 : -1;
+      const sa = a.state === "bought" ? 1 : 0;
+      const sb = b.state === "bought" ? 1 : 0;
+      if (sa !== sb) return sa - sb;
       const an = a.ingredients?.name ?? "";
       const bn = b.ingredients?.name ?? "";
       return an.localeCompare(bn);
@@ -71,6 +66,9 @@ export default async function ShoppingPage() {
     .sort((a, b) => a.localeCompare(b));
   if (byGroup.has(UNGROUPED)) groupKeys.push(UNGROUPED);
 
+  const toBuyCount = active.filter((i) => i.state === "to_buy").length;
+  const boughtCount = active.filter((i) => i.state === "bought").length;
+
   return (
     <main className="min-h-screen p-6 max-w-5xl mx-auto space-y-6">
       <AppHeader current="/shopping" />
@@ -78,19 +76,23 @@ export default async function ShoppingPage() {
         <div>
           <h1 className="font-serif text-3xl text-[var(--foreground)]">Shopping</h1>
           <p className="text-sm text-[var(--muted)] mt-1">
-            From your meal plan + staples you need. Check off as you go.
+            {toBuyCount} to buy
+            {boughtCount > 0 && (
+              <span className="text-[var(--sage)]"> · {boughtCount} ticked</span>
+            )}
+            {have.length > 0 && (
+              <span className="text-[var(--muted)]"> · {have.length} have</span>
+            )}
           </p>
         </div>
         <FinishShoppingButton />
       </div>
 
-      <StaplePreCheck staples={staples} />
-
       <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-4">
-        <h2 className="font-serif text-xl text-[var(--foreground)]">List</h2>
-        {items.length === 0 ? (
+        {active.length === 0 ? (
           <p className="text-sm text-[var(--muted)] italic">
-            Nothing to buy. Plan some meals, mark staples as “need”, or add something below.
+            Nothing to buy right now. Plan some meals, mark staples as needed, or add
+            something below.
           </p>
         ) : (
           <div className="space-y-5">
@@ -116,6 +118,8 @@ export default async function ShoppingPage() {
           </div>
         )}
       </section>
+
+      <HaveSection items={have} />
 
       <AddManualItem ingredients={ingredients} />
     </main>

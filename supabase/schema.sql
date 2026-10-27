@@ -48,33 +48,36 @@ create index recipe_ingredients_recipe_idx on recipe_ingredients (recipe_id);
 create index recipe_ingredients_ingredient_idx on recipe_ingredients (ingredient_id);
 
 -- Meal plan: one row per planned meal.
+-- shopped_at: non-null once this meal has been included in a finished
+-- shopping trip. Set back to null when the recipe or servings changes.
 create table meal_plan (
   id uuid primary key default gen_random_uuid(),
   date date not null,
   recipe_id uuid not null references recipes(id) on delete cascade,
   servings numeric check (servings is null or servings > 0),
   slot text,
+  shopped_at timestamptz,
   created_at timestamptz not null default now()
 );
 create index meal_plan_date_idx on meal_plan (date);
 
--- Shopping items: the persisted working list.
---  source=meal   -> auto-computed from meal plan; replaced on sync (unless bought)
---  source=staple -> staples marked 'need'; replaced on sync (unless bought)
---  source=manual -> user-added; survives sync
--- `quantity` is free text ("500g", "2 cups", ""). Parser lives in src/lib/quantity.ts.
+-- Shopping items: persistent 3-state working list.
+--   state=to_buy  — on the active list, need to buy this trip
+--   state=have    — already in the pantry, hidden from the active list
+--   state=bought  — purchased this trip (deleted on Finish shopping)
+-- Source is 'meal' | 'staple' | 'manual'. On sync, rows in non-to_buy state
+-- are preserved (user decided). `quantity` is free text; parser in src/lib/quantity.ts.
 create table shopping_items (
   id uuid primary key default gen_random_uuid(),
   ingredient_id uuid not null references ingredients(id) on delete cascade,
   quantity text,
   source text not null check (source in ('meal', 'staple', 'manual')),
   source_ref uuid,
-  bought boolean not null default false,
-  bought_at timestamptz,
+  state text not null default 'to_buy' check (state in ('to_buy', 'have', 'bought')),
   created_at timestamptz not null default now()
 );
 create index shopping_items_ingredient_idx on shopping_items (ingredient_id);
-create index shopping_items_bought_idx on shopping_items (bought);
+create index shopping_items_state_idx on shopping_items (state);
 
 -- updated_at triggers for the two mutable tables.
 create or replace function set_updated_at() returns trigger language plpgsql as $$

@@ -6,6 +6,7 @@ import type {
   RecipeIngredient,
   ShoppingItem,
   ShoppingItemSource,
+  ShoppingItemState,
   StapleState,
   WeekStart,
 } from "./types";
@@ -78,12 +79,14 @@ export type Database = {
           recipe_id: string;
           servings?: number | null;
           slot?: string | null;
+          shopped_at?: string | null;
         };
         Update: {
           date?: string;
           recipe_id?: string;
           servings?: number | null;
           slot?: string | null;
+          shopped_at?: string | null;
         };
         Relationships: [];
       };
@@ -95,13 +98,11 @@ export type Database = {
           quantity?: string | null;
           source: ShoppingItemSource;
           source_ref?: string | null;
-          bought?: boolean;
-          bought_at?: string | null;
+          state?: ShoppingItemState;
         };
         Update: {
           quantity?: string | null;
-          bought?: boolean;
-          bought_at?: string | null;
+          state?: ShoppingItemState;
         };
         Relationships: [];
       };

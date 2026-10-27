@@ -39,6 +39,7 @@ export function DayCard({
       recipe_id: recipeId,
       servings: previous?.servings ?? null,
       slot: null,
+      shopped_at: null,
       created_at: previous?.created_at ?? new Date().toISOString(),
       recipes: {
         id: recipe.id,

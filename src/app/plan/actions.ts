@@ -27,7 +27,7 @@ export async function setMealAction(
   if (existing) {
     const { error } = await supabase
       .from("meal_plan")
-      .update({ recipe_id: recipeId, servings: servings ?? null })
+      .update({ recipe_id: recipeId, servings: servings ?? null, shopped_at: null })
       .eq("id", existing.id);
     if (error) return { ok: false, error: error.message };
   } else {
@@ -58,7 +58,7 @@ export async function updateServingsAction(
   if (!isValidISODate(date)) return { ok: false, error: "Invalid date" };
   const { error } = await supabaseAdmin()
     .from("meal_plan")
-    .update({ servings })
+    .update({ servings, shopped_at: null })
     .eq("date", date)
     .is("slot", null);
   if (error) return { ok: false, error: error.message };

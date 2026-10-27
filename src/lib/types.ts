@@ -39,6 +39,7 @@ export type MealPlanEntry = {
   recipe_id: string;
   servings: number | null;
   slot: string | null;
+  shopped_at: string | null;
   created_at: string;
 };
 
@@ -47,6 +48,7 @@ export type MealPlanWithRecipe = MealPlanEntry & {
 };
 
 export type ShoppingItemSource = "meal" | "staple" | "manual";
+export type ShoppingItemState = "to_buy" | "have" | "bought";
 
 export type ShoppingItem = {
   id: string;
@@ -54,8 +56,7 @@ export type ShoppingItem = {
   quantity: string | null;
   source: ShoppingItemSource;
   source_ref: string | null;
-  bought: boolean;
-  bought_at: string | null;
+  state: ShoppingItemState;
   created_at: string;
 };
 

@@ -1,31 +1,62 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, HelpCircle, ShoppingBasket } from "lucide-react";
+import { Check, ChevronDown, HelpCircle, ShoppingBasket } from "lucide-react";
 import type { Ingredient, StapleState } from "@/lib/types";
 import { setStapleStateAction } from "./actions";
 
 type Staple = Pick<Ingredient, "id" | "name" | "staple_state">;
 
 export function StaplePreCheck({ staples }: { staples: Staple[] }) {
+  const [open, setOpen] = useState(false);
+  const needCount = staples.filter((s) => s.staple_state === "need").length;
+  const haveCount = staples.filter((s) => s.staple_state === "have").length;
+  const unchecked = staples.length - needCount - haveCount;
+
   return (
-    <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-3">
-      <div>
-        <h2 className="font-serif text-xl text-[var(--foreground)]">Staples to check</h2>
-        <p className="text-xs text-[var(--muted)] mt-0.5">
-          Mark whether you need to buy or already have each one.
-        </p>
-      </div>
-      {staples.length === 0 ? (
-        <p className="text-sm text-[var(--muted)] italic">
-          No staples yet. Star ingredients on the Ingredients page to add them here.
-        </p>
-      ) : (
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-          {staples.map((s) => (
-            <StapleRow key={s.id} staple={s} />
-          ))}
-        </ul>
+    <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-[var(--surface-muted)] transition-colors"
+      >
+        <div className="flex items-baseline gap-3 min-w-0">
+          <h2 className="font-serif text-lg text-[var(--foreground)]">Staples to check</h2>
+          {staples.length > 0 && (
+            <span className="text-xs text-[var(--muted)] truncate">
+              {unchecked > 0 && <span>{unchecked} to check</span>}
+              {unchecked > 0 && needCount > 0 && <span> · </span>}
+              {needCount > 0 && (
+                <span className="text-[var(--accent)]">{needCount} need</span>
+              )}
+              {(unchecked > 0 || needCount > 0) && haveCount > 0 && <span> · </span>}
+              {haveCount > 0 && <span className="text-[var(--sage)]">{haveCount} have</span>}
+            </span>
+          )}
+        </div>
+        <ChevronDown
+          size={16}
+          className={
+            "text-[var(--muted)] shrink-0 transition-transform " +
+            (open ? "rotate-180" : "")
+          }
+        />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 border-t border-[var(--border)]/60 pt-3">
+          {staples.length === 0 ? (
+            <p className="text-sm text-[var(--muted)] italic">
+              No staples yet. Star ingredients on the Ingredients page to add them here.
+            </p>
+          ) : (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+              {staples.map((s) => (
+                <StapleRow key={s.id} staple={s} />
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </section>
   );

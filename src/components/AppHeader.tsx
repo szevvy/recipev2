@@ -6,7 +6,7 @@ const navItems: { href: string; label: string; disabled?: boolean }[] = [
   { href: "/ingredients", label: "Ingredients" },
   { href: "/recipes", label: "Recipes" },
   { href: "/plan", label: "Plan" },
-  { href: "/shopping", label: "Shopping", disabled: true },
+  { href: "/shopping", label: "Shopping" },
 ];
 
 export function AppHeader({ current }: { current: string }) {

@@ -46,6 +46,23 @@ export type MealPlanWithRecipe = MealPlanEntry & {
   recipes: Pick<Recipe, "id" | "name" | "default_servings" | "image_url"> | null;
 };
 
+export type ShoppingItemSource = "meal" | "staple" | "manual";
+
+export type ShoppingItem = {
+  id: string;
+  ingredient_id: string;
+  quantity: string | null;
+  source: ShoppingItemSource;
+  source_ref: string | null;
+  bought: boolean;
+  bought_at: string | null;
+  created_at: string;
+};
+
+export type ShoppingItemWithIngredient = ShoppingItem & {
+  ingredients: Pick<Ingredient, "id" | "name" | "group_name"> | null;
+};
+
 export type RecipeWithIngredients = Recipe & {
   recipe_ingredients: (RecipeIngredient & { ingredients: Pick<Ingredient, "id" | "name"> })[];
 };

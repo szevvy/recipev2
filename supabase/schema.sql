@@ -59,21 +59,21 @@ create table meal_plan (
 create index meal_plan_date_idx on meal_plan (date);
 
 -- Shopping items: the persisted working list.
---  source=meal   -> source_ref = meal_plan.id
---  source=staple -> source_ref = ingredients.id
---  source=manual -> source_ref null
+--  source=meal   -> auto-computed from meal plan; replaced on sync (unless bought)
+--  source=staple -> staples marked 'need'; replaced on sync (unless bought)
+--  source=manual -> user-added; survives sync
+-- `quantity` is free text ("500g", "2 cups", ""). Parser lives in src/lib/quantity.ts.
 create table shopping_items (
   id uuid primary key default gen_random_uuid(),
   ingredient_id uuid not null references ingredients(id) on delete cascade,
-  qty numeric not null check (qty > 0),
-  unit text,
+  quantity text,
   source text not null check (source in ('meal', 'staple', 'manual')),
   source_ref uuid,
   bought boolean not null default false,
   bought_at timestamptz,
   created_at timestamptz not null default now()
 );
-create index shopping_items_ingredient_idx on shopping_items (ingredient_id, unit);
+create index shopping_items_ingredient_idx on shopping_items (ingredient_id);
 create index shopping_items_bought_idx on shopping_items (bought);
 
 -- updated_at triggers for the two mutable tables.

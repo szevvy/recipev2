@@ -4,6 +4,8 @@ import type {
   MealPlanEntry,
   Recipe,
   RecipeIngredient,
+  ShoppingItem,
+  ShoppingItemSource,
   StapleState,
   WeekStart,
 } from "./types";
@@ -82,6 +84,24 @@ export type Database = {
           recipe_id?: string;
           servings?: number | null;
           slot?: string | null;
+        };
+        Relationships: [];
+      };
+      shopping_items: {
+        Row: ShoppingItem;
+        Insert: {
+          id?: string;
+          ingredient_id: string;
+          quantity?: string | null;
+          source: ShoppingItemSource;
+          source_ref?: string | null;
+          bought?: boolean;
+          bought_at?: string | null;
+        };
+        Update: {
+          quantity?: string | null;
+          bought?: boolean;
+          bought_at?: string | null;
         };
         Relationships: [];
       };

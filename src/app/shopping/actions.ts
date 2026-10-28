@@ -26,6 +26,9 @@ export async function setItemStateAction(
     .update({ state })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
+  // Same row shows in main list + staples + already-have sections; revalidate so
+  // changes in one are reflected everywhere without a hard refresh.
+  revalidatePath("/shopping");
   return { ok: true };
 }
 

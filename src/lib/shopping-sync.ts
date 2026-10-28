@@ -54,12 +54,12 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
   const mergedMeal = mergeShoppingItems(mergeInputs);
   const neededIngredientIds = new Set(mergedMeal.map((m) => m.ingredient_id));
 
-  // 2. Load existing to_buy meal rows (candidates for refresh/removal).
+  // 2. Load existing undecided/to_buy meal rows (candidates for refresh/removal).
   const { data: existingMealRows, error: existingErr } = await supabase
     .from("shopping_items")
     .select("id, ingredient_id, quantity, state")
     .eq("source", "meal")
-    .eq("state", "to_buy");
+    .in("state", ["not_checked", "to_buy"]);
   if (existingErr) return { ok: false, error: existingErr.message };
 
   const existingByIngredient = new Map<
@@ -92,7 +92,7 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
     ingredient_id: string;
     quantity: string | null;
     source: "meal";
-    state: "to_buy";
+    state: "not_checked";
   }> = [];
   for (const m of mergedMeal) {
     if (statefulIngredients.has(m.ingredient_id)) continue;
@@ -106,7 +106,7 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
         ingredient_id: m.ingredient_id,
         quantity: m.quantity,
         source: "meal",
-        state: "to_buy",
+        state: "not_checked",
       });
     }
   }
@@ -130,11 +130,11 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
   const stapleInserts: Array<{
     ingredient_id: string;
     source: "staple";
-    state: "have";
+    state: "not_checked";
   }> = [];
   for (const s of staples ?? []) {
     if (!anyRowFor.has(s.id)) {
-      stapleInserts.push({ ingredient_id: s.id, source: "staple", state: "have" });
+      stapleInserts.push({ ingredient_id: s.id, source: "staple", state: "not_checked" });
     }
   }
 

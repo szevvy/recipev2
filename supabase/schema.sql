@@ -61,19 +61,21 @@ create table meal_plan (
 );
 create index meal_plan_date_idx on meal_plan (date);
 
--- Shopping items: persistent 3-state working list.
---   state=to_buy  — on the active list, need to buy this trip
---   state=have    — already in the pantry, hidden from the active list
---   state=bought  — purchased this trip (deleted on Finish shopping)
--- Source is 'meal' | 'staple' | 'manual'. On sync, rows in non-to_buy state
--- are preserved (user decided). `quantity` is free text; parser in src/lib/quantity.ts.
+-- Shopping items: persistent 4-state working list.
+--   state=not_checked  ? — fresh, needs a decision (default for meal/staple sync)
+--   state=to_buy       🛒 — on the active list, need to buy this trip
+--   state=have         🏠 — already at home, hidden from the active list
+--   state=bought       ✓ — purchased this trip (deleted on Finish shopping)
+-- Source is 'meal' | 'staple' | 'manual'. On sync, rows with any user-set state
+-- are preserved. `quantity` is free text; parser in src/lib/quantity.ts.
 create table shopping_items (
   id uuid primary key default gen_random_uuid(),
   ingredient_id uuid not null references ingredients(id) on delete cascade,
   quantity text,
   source text not null check (source in ('meal', 'staple', 'manual')),
   source_ref uuid,
-  state text not null default 'to_buy' check (state in ('to_buy', 'have', 'bought')),
+  state text not null default 'not_checked'
+    check (state in ('not_checked', 'to_buy', 'have', 'bought')),
   created_at timestamptz not null default now()
 );
 create index shopping_items_ingredient_idx on shopping_items (ingredient_id);

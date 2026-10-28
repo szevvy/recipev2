@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, Home, ShoppingBasket, X } from "lucide-react";
+import { Check, HelpCircle, Home, ShoppingBasket, X } from "lucide-react";
 import type { ShoppingItemState, ShoppingItemWithIngredient } from "@/lib/types";
 import { removeShoppingItemAction, setItemStateAction } from "./actions";
 
@@ -15,15 +15,13 @@ export function ShoppingItemRow({ item }: { item: ShoppingItemWithIngredient }) 
     setState(item.state);
   }, [item.state]);
 
-  function pick(next: ShoppingItemState) {
+  function update(next: ShoppingItemState) {
+    if (next === state) return;
     const previous = state;
-    // Clicking the current state cycles it back to default (to_buy) so the user
-    // can quickly undo without hunting for the right button.
-    const resolved = state === next ? "to_buy" : next;
-    setState(resolved);
+    setState(next);
     setError(null);
     startTransition(async () => {
-      const result = await setItemStateAction(item.id, resolved);
+      const result = await setItemStateAction(item.id, next);
       if (!result.ok) {
         setState(previous);
         setError(result.error);
@@ -45,49 +43,15 @@ export function ShoppingItemRow({ item }: { item: ShoppingItemWithIngredient }) 
   if (removed) return null;
 
   const isBought = state === "bought";
-  const isHave = state === "have";
-
-  const btnBase =
-    "inline-flex items-center justify-center h-7 w-7 rounded-full transition-colors shrink-0";
 
   return (
     <li
       className={
-        "flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors " +
-        (isBought ? "opacity-50" : "") +
-        " hover:bg-[var(--surface-muted)]"
+        "flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--surface-muted)]" +
+        (isBought ? " opacity-50" : "")
       }
     >
-      <div className="flex items-center gap-1 shrink-0">
-        <button
-          type="button"
-          onClick={() => pick("have")}
-          title={isHave ? "On the list again" : "Already have"}
-          className={
-            btnBase +
-            " " +
-            (isHave
-              ? "bg-[var(--sage)] text-white"
-              : "text-[var(--muted)] hover:bg-[var(--sage)]/15 hover:text-[var(--sage)]")
-          }
-        >
-          <Home size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => pick("bought")}
-          title={isBought ? "Un-tick" : "Got it"}
-          className={
-            btnBase +
-            " " +
-            (isBought
-              ? "bg-[var(--accent)] text-white"
-              : "text-[var(--muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]")
-          }
-        >
-          <Check size={14} />
-        </button>
-      </div>
+      <StatePicker state={state} onChange={update} />
       <div className="flex-1 min-w-0">
         <span
           className={
@@ -108,6 +72,10 @@ export function ShoppingItemRow({ item }: { item: ShoppingItemWithIngredient }) 
           </span>
         )}
       </div>
+      <BoughtButton
+        active={isBought}
+        onClick={() => update(isBought ? "to_buy" : "bought")}
+      />
       {error && <span className="text-xs text-red-600">{error}</span>}
       <button
         type="button"
@@ -118,6 +86,92 @@ export function ShoppingItemRow({ item }: { item: ShoppingItemWithIngredient }) 
         <X size={14} />
       </button>
     </li>
+  );
+}
+
+function StatePicker({
+  state,
+  onChange,
+}: {
+  state: ShoppingItemState;
+  onChange: (next: ShoppingItemState) => void;
+}) {
+  const options: Array<{
+    value: Exclude<ShoppingItemState, "bought">;
+    title: string;
+    icon: React.ReactNode;
+    activeClass: string;
+  }> = [
+    {
+      value: "not_checked",
+      title: "Not checked yet",
+      icon: <HelpCircle size={14} />,
+      activeClass: "bg-stone-300 text-white",
+    },
+    {
+      value: "have",
+      title: "Already have",
+      icon: <Home size={14} />,
+      activeClass: "bg-[var(--sage)] text-white",
+    },
+    {
+      value: "to_buy",
+      title: "Need to buy",
+      icon: <ShoppingBasket size={14} />,
+      activeClass: "bg-[var(--accent)] text-white",
+    },
+  ];
+
+  // When state === 'bought', none of the picker buttons is highlighted — the
+  // bought check takes precedence; clicking any picker button also un-ticks.
+  const activeKey = state === "bought" ? null : state;
+
+  return (
+    <div className="flex items-center gap-0.5 shrink-0">
+      {options.map((opt) => {
+        const active = activeKey === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            title={opt.title}
+            className={
+              "inline-flex items-center justify-center h-7 w-7 rounded-full transition-colors " +
+              (active
+                ? opt.activeClass
+                : "text-[var(--muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--foreground)]")
+            }
+          >
+            {opt.icon}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function BoughtButton({
+  active,
+  onClick,
+}: {
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={active ? "Un-tick" : "Got it"}
+      className={
+        "inline-flex items-center justify-center h-7 w-7 rounded-full border transition-colors shrink-0 " +
+        (active
+          ? "bg-[var(--accent)] border-[var(--accent)] text-white"
+          : "border-[var(--border)] text-transparent hover:border-[var(--accent)] hover:text-[var(--accent)]")
+      }
+    >
+      <Check size={14} />
+    </button>
   );
 }
 
@@ -141,7 +195,7 @@ export function HaveRow({ item }: { item: ShoppingItemWithIngredient }) {
 
   return (
     <li className="flex items-center gap-2 py-1 text-sm">
-      <ShoppingBasket size={12} className="text-[var(--muted)]/60 shrink-0" />
+      <Home size={12} className="text-[var(--sage)]/70 shrink-0" />
       <span className="flex-1 truncate text-[var(--muted)]">
         {item.quantity ? <span>{item.quantity} </span> : null}
         {item.ingredients?.name ?? "(unknown)"}

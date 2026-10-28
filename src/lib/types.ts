@@ -48,7 +48,7 @@ export type MealPlanWithRecipe = MealPlanEntry & {
 };
 
 export type ShoppingItemSource = "meal" | "staple" | "manual";
-export type ShoppingItemState = "to_buy" | "have" | "bought";
+export type ShoppingItemState = "not_checked" | "to_buy" | "have" | "bought";
 
 export type ShoppingItem = {
   id: string;

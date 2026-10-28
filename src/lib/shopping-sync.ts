@@ -52,7 +52,6 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
     }
   }
   const mergedMeal = mergeShoppingItems(mergeInputs);
-  const neededIngredientIds = new Set(mergedMeal.map((m) => m.ingredient_id));
 
   // 2. Load existing undecided/to_buy meal rows (candidates for refresh/removal).
   const { data: existingMealRows, error: existingErr } = await supabase
@@ -111,11 +110,9 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
     }
   }
 
-  // 4. Delete orphaned to_buy meal rows (ingredient no longer in any unshopped meal).
-  const orphanIds: string[] = [];
-  for (const [ingredientId, row] of existingByIngredient) {
-    if (!neededIngredientIds.has(ingredientId)) orphanIds.push(row.id);
-  }
+  // 4. (No orphan deletion.) Items the user hasn't engaged with (?/🛒) stay on
+  //    the list until manually removed. Deleting them silently when a meal is
+  //    unplanned (or marked shopped) meant forgotten items vanished without trace.
 
   // 5. Ensure a row exists for every staple (default state='have').
   const { data: staples, error: staplesErr } = await supabase
@@ -139,10 +136,6 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
   }
 
   // Fire off the mutations.
-  if (orphanIds.length > 0) {
-    const { error } = await supabase.from("shopping_items").delete().in("id", orphanIds);
-    if (error) return { ok: false, error: error.message };
-  }
   for (const u of updates) {
     const { error } = await supabase
       .from("shopping_items")

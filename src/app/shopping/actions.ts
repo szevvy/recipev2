@@ -18,7 +18,7 @@ export async function setItemStateAction(
   id: string,
   state: ShoppingItemState,
 ): Promise<ActionResult> {
-  if (!["to_buy", "have", "bought"].includes(state)) {
+  if (!["not_checked", "to_buy", "have", "bought"].includes(state)) {
     return { ok: false, error: "Invalid state" };
   }
   const { error } = await supabaseAdmin()

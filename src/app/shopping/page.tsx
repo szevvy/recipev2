@@ -7,6 +7,7 @@ import { AddManualItem } from "./AddManualItem";
 import { FinishShoppingButton } from "./FinishShoppingButton";
 import { HaveSection } from "./HaveSection";
 import { ShoppingItemRow } from "./ShoppingItemRow";
+import { StaplesSection } from "./StaplesSection";
 
 export const instant = false;
 
@@ -20,7 +21,7 @@ export default async function ShoppingPage() {
   const [itemsResp, ingredientsResp] = await Promise.all([
     supabase
       .from("shopping_items")
-      .select("*, ingredients(id, name, group_name)")
+      .select("*, ingredients(id, name, group_name, is_staple)")
       .order("created_at"),
     supabase.from("ingredients").select("*").order("name"),
   ]);
@@ -42,6 +43,9 @@ export default async function ShoppingPage() {
 
   const active = items.filter((i) => i.state !== "have");
   const have = items.filter((i) => i.state === "have");
+  const staples = items.filter(
+    (i) => (i.ingredients as { is_staple?: boolean } | null)?.is_staple === true,
+  );
 
   // Group active items by group_name
   const byGroup = new Map<string, ShoppingItemWithIngredient[]>();
@@ -67,6 +71,7 @@ export default async function ShoppingPage() {
   if (byGroup.has(UNGROUPED)) groupKeys.push(UNGROUPED);
 
   const toBuyCount = active.filter((i) => i.state === "to_buy").length;
+  const notCheckedCount = active.filter((i) => i.state === "not_checked").length;
   const boughtCount = active.filter((i) => i.state === "bought").length;
 
   return (
@@ -76,7 +81,8 @@ export default async function ShoppingPage() {
         <div>
           <h1 className="font-serif text-3xl text-[var(--foreground)]">Shopping</h1>
           <p className="text-sm text-[var(--muted)] mt-1">
-            {toBuyCount} to buy
+            {notCheckedCount > 0 && <span>{notCheckedCount} to review · </span>}
+            <span className="text-[var(--accent)]">{toBuyCount} to buy</span>
             {boughtCount > 0 && (
               <span className="text-[var(--sage)]"> · {boughtCount} ticked</span>
             )}
@@ -118,6 +124,8 @@ export default async function ShoppingPage() {
           </div>
         )}
       </section>
+
+      <StaplesSection staples={staples} />
 
       <HaveSection items={have} />
 

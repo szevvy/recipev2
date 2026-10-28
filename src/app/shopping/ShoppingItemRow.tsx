@@ -51,7 +51,10 @@ export function ShoppingItemRow({ item }: { item: ShoppingItemWithIngredient }) 
         (isBought ? " opacity-50" : "")
       }
     >
-      <StatePicker state={state} onChange={update} />
+      <BoughtButton
+        active={isBought}
+        onClick={() => update(isBought ? "to_buy" : "bought")}
+      />
       <div className="flex-1 min-w-0">
         <span
           className={
@@ -72,11 +75,8 @@ export function ShoppingItemRow({ item }: { item: ShoppingItemWithIngredient }) 
           </span>
         )}
       </div>
-      <BoughtButton
-        active={isBought}
-        onClick={() => update(isBought ? "to_buy" : "bought")}
-      />
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && <span className="text-xs text-red-600 mr-1">{error}</span>}
+      <StatePicker state={state} onChange={update} />
       <button
         type="button"
         onClick={remove}
@@ -89,7 +89,7 @@ export function ShoppingItemRow({ item }: { item: ShoppingItemWithIngredient }) 
   );
 }
 
-function StatePicker({
+export function StatePicker({
   state,
   onChange,
 }: {

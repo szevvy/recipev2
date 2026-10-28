@@ -56,9 +56,10 @@ export async function addManualItemAction(
 }
 
 // Finish shopping:
-//   - Delete rows with state='bought' (purchased, consumed by meal)
-//   - Stamp all current (unshopped) meal_plan entries so sync won't re-add their items
-//   - Leaves state='have' and state='to_buy' alone
+//   1. Delete rows with state='bought' (purchased)
+//   2. Reset remaining staple rows to 'not_checked' so next trip starts fresh
+//      (meal/manual rows keep their state — forgotten items persist)
+//   3. Stamp current (unshopped) meal_plan entries so sync won't re-add their items
 export async function finishShoppingAction(): Promise<ActionResult> {
   const supabase = supabaseAdmin();
   const today = new Date().toISOString().slice(0, 10);
@@ -69,6 +70,13 @@ export async function finishShoppingAction(): Promise<ActionResult> {
     .delete()
     .eq("state", "bought");
   if (delErr) return { ok: false, error: delErr.message };
+
+  const { error: resetErr } = await supabase
+    .from("shopping_items")
+    .update({ state: "not_checked" })
+    .eq("source", "staple")
+    .neq("state", "not_checked");
+  if (resetErr) return { ok: false, error: resetErr.message };
 
   const { error: stampErr } = await supabase
     .from("meal_plan")

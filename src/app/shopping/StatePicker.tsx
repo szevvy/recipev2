@@ -19,21 +19,24 @@ const OPTIONS: Option[] = [
     value: "not_checked",
     label: "Not reviewed",
     Icon: HelpCircle,
-    activeClass: "bg-red-600 text-white border-red-600",
-    textClass: "text-red-600",
+    // Faint pink tint so unreviewed items are noticeable without screaming.
+    activeClass: "bg-red-50 text-red-500 border-red-200",
+    textClass: "text-red-500",
   },
   {
     value: "have",
     label: "Already have",
     Icon: Home,
-    activeClass: "bg-[var(--sage)] text-white border-[var(--sage)]",
+    activeClass:
+      "bg-[var(--surface-muted)] text-[var(--sage)] border-[var(--border)]",
     textClass: "text-[var(--sage)]",
   },
   {
     value: "to_buy",
     label: "Need to buy",
     Icon: ShoppingBasket,
-    activeClass: "bg-[var(--accent)] text-white border-[var(--accent)]",
+    activeClass:
+      "bg-[var(--surface-muted)] text-[var(--accent)] border-[var(--border)]",
     textClass: "text-[var(--accent)]",
   },
 ];

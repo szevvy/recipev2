@@ -114,26 +114,9 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
   //    the list until manually removed. Deleting them silently when a meal is
   //    unplanned (or marked shopped) meant forgotten items vanished without trace.
 
-  // 5. Ensure a row exists for every staple (default state='have').
-  const { data: staples, error: staplesErr } = await supabase
-    .from("ingredients")
-    .select("id")
-    .eq("is_staple", true);
-  if (staplesErr) return { ok: false, error: staplesErr.message };
-
-  const { data: allRows } = await supabase.from("shopping_items").select("ingredient_id");
-  const anyRowFor = new Set((allRows ?? []).map((r) => r.ingredient_id));
-
-  const stapleInserts: Array<{
-    ingredient_id: string;
-    source: "staple";
-    state: "not_checked";
-  }> = [];
-  for (const s of staples ?? []) {
-    if (!anyRowFor.has(s.id)) {
-      stapleInserts.push({ ingredient_id: s.id, source: "staple", state: "not_checked" });
-    }
-  }
+  // 5. (No staple auto-add.) Staples now appear only in the dedicated Staples
+  //    section (which reads ingredients.is_staple=true directly). Rows are
+  //    created only when the user explicitly picks a state via that picker.
 
   // Fire off the mutations.
   for (const u of updates) {
@@ -145,10 +128,6 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
   }
   if (inserts.length > 0) {
     const { error } = await supabase.from("shopping_items").insert(inserts);
-    if (error) return { ok: false, error: error.message };
-  }
-  if (stapleInserts.length > 0) {
-    const { error } = await supabase.from("shopping_items").insert(stapleInserts);
     if (error) return { ok: false, error: error.message };
   }
 

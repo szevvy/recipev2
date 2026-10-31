@@ -14,6 +14,48 @@ export async function syncShoppingListAction(): Promise<ActionResult> {
   return { ok: true };
 }
 
+// Set state for a staple ingredient via its *ingredient_id* (not a shopping_items id).
+// Creates the row on first pick, deletes it when the user picks ? back.
+export async function setStapleStateAction(
+  ingredientId: string,
+  state: ShoppingItemState,
+): Promise<ActionResult> {
+  if (!["not_checked", "to_buy", "have", "bought"].includes(state)) {
+    return { ok: false, error: "Invalid state" };
+  }
+  const supabase = supabaseAdmin();
+
+  const { data: existing } = await supabase
+    .from("shopping_items")
+    .select("id")
+    .eq("source", "staple")
+    .eq("ingredient_id", ingredientId)
+    .maybeSingle();
+
+  if (state === "not_checked") {
+    if (existing) {
+      const { error } = await supabase.from("shopping_items").delete().eq("id", existing.id);
+      if (error) return { ok: false, error: error.message };
+    }
+  } else if (existing) {
+    const { error } = await supabase
+      .from("shopping_items")
+      .update({ state })
+      .eq("id", existing.id);
+    if (error) return { ok: false, error: error.message };
+  } else {
+    const { error } = await supabase.from("shopping_items").insert({
+      ingredient_id: ingredientId,
+      source: "staple",
+      state,
+    });
+    if (error) return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/shopping");
+  return { ok: true };
+}
+
 export async function setItemStateAction(
   id: string,
   state: ShoppingItemState,

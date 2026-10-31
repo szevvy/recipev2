@@ -7,7 +7,7 @@ import { AddManualItem } from "./AddManualItem";
 import { FinishShoppingButton } from "./FinishShoppingButton";
 import { HaveSection } from "./HaveSection";
 import { ShoppingItemRow } from "./ShoppingItemRow";
-import { StaplesSection } from "./StaplesSection";
+import { StaplesSection, type StapleView } from "./StaplesSection";
 
 export const instant = false;
 
@@ -43,9 +43,20 @@ export default async function ShoppingPage() {
 
   const active = items.filter((i) => i.state !== "have");
   const have = items.filter((i) => i.state === "have");
-  const staples = items.filter(
-    (i) => (i.ingredients as { is_staple?: boolean } | null)?.is_staple === true,
-  );
+
+  // Staples section: every is_staple=true ingredient, with its state from the
+  // (optional) matching source='staple' shopping_items row. No row => not_checked.
+  const stapleRowByIngredient = new Map<string, ShoppingItemWithIngredient>();
+  for (const item of items) {
+    if (item.source === "staple") stapleRowByIngredient.set(item.ingredient_id, item);
+  }
+  const staples: StapleView[] = ingredients
+    .filter((i) => i.is_staple)
+    .map((i) => ({
+      ingredient_id: i.id,
+      name: i.name,
+      state: stapleRowByIngredient.get(i.id)?.state ?? "not_checked",
+    }));
 
   // Group active items by group_name
   const byGroup = new Map<string, ShoppingItemWithIngredient[]>();

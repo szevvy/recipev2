@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, HelpCircle, Home, ShoppingBasket, X } from "lucide-react";
+import { Check, Home, X } from "lucide-react";
 import type { ShoppingItemState, ShoppingItemWithIngredient } from "@/lib/types";
 import { removeShoppingItemAction, setItemStateAction } from "./actions";
+import { StatePicker } from "./StatePicker";
 
 export function ShoppingItemRow({ item }: { item: ShoppingItemWithIngredient }) {
   const [state, setState] = useState<ShoppingItemState>(item.state);
@@ -86,68 +87,6 @@ export function ShoppingItemRow({ item }: { item: ShoppingItemWithIngredient }) 
         <X size={14} />
       </button>
     </li>
-  );
-}
-
-export function StatePicker({
-  state,
-  onChange,
-}: {
-  state: ShoppingItemState;
-  onChange: (next: ShoppingItemState) => void;
-}) {
-  const options: Array<{
-    value: Exclude<ShoppingItemState, "bought">;
-    title: string;
-    icon: React.ReactNode;
-    activeClass: string;
-  }> = [
-    {
-      value: "not_checked",
-      title: "Not checked yet",
-      icon: <HelpCircle size={14} />,
-      activeClass: "bg-stone-300 text-white",
-    },
-    {
-      value: "have",
-      title: "Already have",
-      icon: <Home size={14} />,
-      activeClass: "bg-[var(--sage)] text-white",
-    },
-    {
-      value: "to_buy",
-      title: "Need to buy",
-      icon: <ShoppingBasket size={14} />,
-      activeClass: "bg-[var(--accent)] text-white",
-    },
-  ];
-
-  // When state === 'bought', none of the picker buttons is highlighted — the
-  // bought check takes precedence; clicking any picker button also un-ticks.
-  const activeKey = state === "bought" ? null : state;
-
-  return (
-    <div className="flex items-center gap-0.5 shrink-0">
-      {options.map((opt) => {
-        const active = activeKey === opt.value;
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onChange(opt.value)}
-            title={opt.title}
-            className={
-              "inline-flex items-center justify-center h-7 w-7 rounded-full transition-colors " +
-              (active
-                ? opt.activeClass
-                : "text-[var(--muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--foreground)]")
-            }
-          >
-            {opt.icon}
-          </button>
-        );
-      })}
-    </div>
   );
 }
 

@@ -2,21 +2,25 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { ChevronDown, Sparkles } from "lucide-react";
-import type { ShoppingItemState, ShoppingItemWithIngredient } from "@/lib/types";
-import { setItemStateAction } from "./actions";
-import { StatePicker } from "./ShoppingItemRow";
+import type { ShoppingItemState } from "@/lib/types";
+import { setStapleStateAction } from "./actions";
+import { StatePicker } from "./StatePicker";
 
-export function StaplesSection({ staples }: { staples: ShoppingItemWithIngredient[] }) {
+export type StapleView = {
+  ingredient_id: string;
+  name: string;
+  state: ShoppingItemState;
+};
+
+export function StaplesSection({ staples }: { staples: StapleView[] }) {
   const [open, setOpen] = useState(false);
   if (staples.length === 0) return null;
 
-  const sorted = [...staples].sort((a, b) =>
-    (a.ingredients?.name ?? "").localeCompare(b.ingredients?.name ?? ""),
-  );
+  const sorted = [...staples].sort((a, b) => a.name.localeCompare(b.name));
 
-  const notCheckedCount = staples.filter((s) => s.state === "not_checked").length;
-  const toBuyCount = staples.filter((s) => s.state === "to_buy").length;
-  const haveCount = staples.filter((s) => s.state === "have").length;
+  const notReviewed = staples.filter((s) => s.state === "not_checked").length;
+  const toBuy = staples.filter((s) => s.state === "to_buy").length;
+  const have = staples.filter((s) => s.state === "have").length;
 
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm overflow-hidden">
@@ -32,13 +36,13 @@ export function StaplesSection({ staples }: { staples: ShoppingItemWithIngredien
             <span className="font-serif text-base text-[var(--foreground)]">Staples</span>
           </div>
           <span className="text-xs text-[var(--muted)] truncate">
-            {notCheckedCount > 0 && <span>{notCheckedCount} to review</span>}
-            {notCheckedCount > 0 && (toBuyCount > 0 || haveCount > 0) && <span> · </span>}
-            {toBuyCount > 0 && (
-              <span className="text-[var(--accent)]">{toBuyCount} to buy</span>
+            {notReviewed > 0 && (
+              <span className="text-red-600 font-medium">{notReviewed} to review</span>
             )}
-            {toBuyCount > 0 && haveCount > 0 && <span> · </span>}
-            {haveCount > 0 && <span className="text-[var(--sage)]">{haveCount} have</span>}
+            {notReviewed > 0 && (toBuy > 0 || have > 0) && <span> · </span>}
+            {toBuy > 0 && <span className="text-[var(--accent)]">{toBuy} to buy</span>}
+            {toBuy > 0 && have > 0 && <span> · </span>}
+            {have > 0 && <span className="text-[var(--sage)]">{have} have</span>}
           </span>
         </div>
         <ChevronDown
@@ -53,7 +57,7 @@ export function StaplesSection({ staples }: { staples: ShoppingItemWithIngredien
         <div className="px-3 pb-3 border-t border-[var(--border)]/60 pt-2">
           <ul className="divide-y divide-[var(--border)]/40">
             {sorted.map((item) => (
-              <StapleRow key={item.id} item={item} />
+              <StapleRow key={item.ingredient_id} item={item} />
             ))}
           </ul>
         </div>
@@ -62,7 +66,7 @@ export function StaplesSection({ staples }: { staples: ShoppingItemWithIngredien
   );
 }
 
-function StapleRow({ item }: { item: ShoppingItemWithIngredient }) {
+function StapleRow({ item }: { item: StapleView }) {
   const [state, setState] = useState<ShoppingItemState>(item.state);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +81,7 @@ function StapleRow({ item }: { item: ShoppingItemWithIngredient }) {
     setState(next);
     setError(null);
     startTransition(async () => {
-      const result = await setItemStateAction(item.id, next);
+      const result = await setStapleStateAction(item.ingredient_id, next);
       if (!result.ok) {
         setState(previous);
         setError(result.error);
@@ -87,9 +91,7 @@ function StapleRow({ item }: { item: ShoppingItemWithIngredient }) {
 
   return (
     <li className="flex items-center gap-2 px-2 py-1.5">
-      <span className="flex-1 text-sm text-[var(--foreground)] truncate">
-        {item.ingredients?.name ?? "(unknown)"}
-      </span>
+      <span className="flex-1 text-sm text-[var(--foreground)] truncate">{item.name}</span>
       {error && <span className="text-xs text-red-600">{error}</span>}
       <StatePicker state={state} onChange={update} />
     </li>

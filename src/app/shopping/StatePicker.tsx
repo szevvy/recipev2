@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, HelpCircle, Home, ShoppingBasket } from "lucide-react";
+import { Check, ChevronDown, HelpCircle, Home, ShoppingBasket, Trash2 } from "lucide-react";
 import type { ShoppingItemState } from "@/lib/types";
 
 type PickState = Exclude<ShoppingItemState, "bought">;
@@ -44,9 +44,11 @@ const OPTIONS: Option[] = [
 export function StatePicker({
   state,
   onChange,
+  onRemove,
 }: {
   state: ShoppingItemState;
   onChange: (next: PickState) => void;
+  onRemove?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -106,6 +108,21 @@ export function StatePicker({
               </li>
             );
           })}
+          {onRemove && (
+            <li className="border-t border-[var(--border)]/60 mt-1 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onRemove();
+                  setOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-red-600 hover:bg-red-50"
+              >
+                <Trash2 size={14} />
+                <span className="flex-1">Remove from list</span>
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </div>

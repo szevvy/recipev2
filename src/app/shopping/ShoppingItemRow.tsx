@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, Home, X } from "lucide-react";
+import { Check, Home } from "lucide-react";
 import type { ShoppingItemState, ShoppingItemWithIngredient } from "@/lib/types";
 import { removeShoppingItemAction, setItemStateAction } from "./actions";
 import { StatePicker } from "./StatePicker";
@@ -77,15 +77,7 @@ export function ShoppingItemRow({ item }: { item: ShoppingItemWithIngredient }) 
         )}
       </div>
       {error && <span className="text-xs text-red-600 mr-1">{error}</span>}
-      <StatePicker state={state} onChange={update} />
-      <button
-        type="button"
-        onClick={remove}
-        title="Remove"
-        className="p-1 rounded-full text-[var(--muted)] hover:text-red-600 hover:bg-red-50 transition-colors"
-      >
-        <X size={14} />
-      </button>
+      <StatePicker state={state} onChange={update} onRemove={remove} />
     </li>
   );
 }

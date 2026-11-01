@@ -52,13 +52,16 @@ export default async function ShoppingPage() {
 
   const stapleRowByIngredient = new Map<string, ShoppingItemWithIngredient>();
   for (const item of items) {
-    if (item.source === "staple") stapleRowByIngredient.set(item.ingredient_id, item);
+    if (item.source === "staple" && item.ingredient_id) {
+      stapleRowByIngredient.set(item.ingredient_id, item);
+    }
   }
   const staples: StapleView[] = ingredients
     .filter((i) => i.is_staple)
     .map((i) => ({
       ingredient_id: i.id,
       name: i.name,
+      group_name: i.group_name,
       state: stapleRowByIngredient.get(i.id)?.state ?? "not_checked",
     }));
 
@@ -92,7 +95,7 @@ export default async function ShoppingPage() {
         <ShoppingList items={active} categoryMeta={categoryMeta} />
       </section>
 
-      <StaplesSection staples={staples} />
+      <StaplesSection staples={staples} categoryMeta={categoryMeta} />
 
       <HaveSection items={have} />
 

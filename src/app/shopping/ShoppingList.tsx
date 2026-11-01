@@ -68,9 +68,9 @@ export function ShoppingList({
           ? { backgroundColor: color.chipBg, color: color.chipText }
           : undefined;
         const ulStyle = color
-          ? { backgroundColor: `${color.chipBg}66`, borderColor: `${color.chipText}1a` }
+          ? { backgroundColor: `${color.chipBg}47`, borderColor: `${color.chipText}12` }
           : undefined;
-        const divideBorder = color ? `${color.chipText}1a` : undefined;
+        const divideBorder = color ? `${color.chipText}12` : undefined;
         return (
           <section key={key} className="space-y-1">
             <h3

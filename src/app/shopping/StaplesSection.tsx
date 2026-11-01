@@ -2,25 +2,55 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { ChevronDown, Sparkles } from "lucide-react";
-import type { ShoppingItemState } from "@/lib/types";
+import { paletteColor } from "@/lib/category-palette";
+import type { CategoryMetaRow, ShoppingItemState } from "@/lib/types";
 import { setStapleStateAction } from "./actions";
 import { StatePicker } from "./StatePicker";
 
 export type StapleView = {
   ingredient_id: string;
   name: string;
+  group_name: string | null;
   state: ShoppingItemState;
 };
 
-export function StaplesSection({ staples }: { staples: StapleView[] }) {
+const UNGROUPED = "__ungrouped__";
+
+export function StaplesSection({
+  staples,
+  categoryMeta,
+}: {
+  staples: StapleView[];
+  categoryMeta: CategoryMetaRow[];
+}) {
   const [open, setOpen] = useState(false);
   if (staples.length === 0) return null;
-
-  const sorted = [...staples].sort((a, b) => a.name.localeCompare(b.name));
 
   const notReviewed = staples.filter((s) => s.state === "not_checked").length;
   const toBuy = staples.filter((s) => s.state === "to_buy").length;
   const have = staples.filter((s) => s.state === "have").length;
+
+  const metaByName = new Map<string, CategoryMetaRow>();
+  for (const m of categoryMeta) metaByName.set(m.name, m);
+
+  const byGroup = new Map<string, StapleView[]>();
+  for (const s of staples) {
+    const key = s.group_name ?? UNGROUPED;
+    const bucket = byGroup.get(key) ?? [];
+    bucket.push(s);
+    byGroup.set(key, bucket);
+  }
+  for (const bucket of byGroup.values()) {
+    bucket.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  const groupKeys = Array.from(byGroup.keys()).sort((a, b) => {
+    if (a === UNGROUPED) return 1;
+    if (b === UNGROUPED) return -1;
+    const sa = metaByName.get(a)?.sort_order ?? 1_000_000;
+    const sb = metaByName.get(b)?.sort_order ?? 1_000_000;
+    if (sa !== sb) return sa - sb;
+    return a.localeCompare(b);
+  });
 
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm overflow-hidden">
@@ -54,19 +84,62 @@ export function StaplesSection({ staples }: { staples: StapleView[] }) {
         />
       </button>
       {open && (
-        <div className="px-3 pb-3 border-t border-[var(--border)]/60 pt-2">
-          <ul className="divide-y divide-[var(--border)]/40">
-            {sorted.map((item) => (
-              <StapleRow key={item.ingredient_id} item={item} />
-            ))}
-          </ul>
+        <div className="px-3 pb-3 border-t border-[var(--border)]/60 pt-2 space-y-3">
+          {groupKeys.map((key) => {
+            const label = key === UNGROUPED ? "Other" : key;
+            const bucket = byGroup.get(key) ?? [];
+            const color = paletteColor(metaByName.get(key)?.color ?? null);
+            const headerStyle = color
+              ? { backgroundColor: color.chipBg, color: color.chipText }
+              : undefined;
+            const ulStyle = color
+              ? { backgroundColor: `${color.chipBg}30` }
+              : undefined;
+            return (
+              <section key={key} className="space-y-1">
+                <h4
+                  className={
+                    "inline-flex items-center font-serif text-xs uppercase tracking-wide px-2 py-0.5 rounded-full " +
+                    (color ? "" : "text-[var(--muted)]")
+                  }
+                  style={headerStyle}
+                >
+                  {label}
+                  <span
+                    className="ml-1.5 text-[10px] font-sans normal-case font-normal opacity-70"
+                    style={color ? { color: color.chipText } : undefined}
+                  >
+                    ({bucket.length})
+                  </span>
+                </h4>
+                <ul
+                  className={color ? "rounded-lg p-1" : "divide-y divide-[var(--border)]/40"}
+                  style={ulStyle}
+                >
+                  {bucket.map((item) => (
+                    <StapleRow
+                      key={item.ingredient_id}
+                      item={item}
+                      chipText={color?.chipText ?? null}
+                    />
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
         </div>
       )}
     </section>
   );
 }
 
-function StapleRow({ item }: { item: StapleView }) {
+function StapleRow({
+  item,
+  chipText,
+}: {
+  item: StapleView;
+  chipText: string | null;
+}) {
   const [state, setState] = useState<ShoppingItemState>(item.state);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -89,9 +162,13 @@ function StapleRow({ item }: { item: StapleView }) {
     });
   }
 
+  const nameStyle = chipText ? { color: `${chipText}d9` } : undefined;
+
   return (
     <li className="flex items-center gap-2 px-2 py-1.5">
-      <span className="flex-1 text-sm text-[var(--foreground)] truncate">{item.name}</span>
+      <span className="flex-1 text-sm truncate" style={nameStyle}>
+        {item.name}
+      </span>
       {error && <span className="text-xs text-red-600">{error}</span>}
       <StatePicker state={state} onChange={update} />
     </li>

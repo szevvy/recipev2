@@ -131,6 +131,37 @@ export async function addManualItemAction(
   return { ok: true };
 }
 
+// Add a one-off item that isn't an ingredient (blown light bulb, batteries).
+// Lands in the shopping list with no ingredient_id, grouped under "Other".
+export async function addOneOffItemAction(
+  name: string,
+  quantity: string,
+): Promise<ActionResult> {
+  const trimmedName = name.trim();
+  if (!trimmedName) return { ok: false, error: "Give it a name" };
+  const trimmedQty = quantity.trim();
+  const supabase = supabaseAdmin();
+  const { data: inserted, error } = await supabase
+    .from("shopping_items")
+    .insert({
+      name: trimmedName,
+      quantity: trimmedQty || null,
+      source: "manual",
+      state: "to_buy",
+    })
+    .select("id")
+    .single();
+  if (error || !inserted) return { ok: false, error: error?.message ?? "insert failed" };
+  const { error: srcErr } = await supabase.from("shopping_item_sources").insert({
+    shopping_item_id: inserted.id,
+    kind: "manual",
+    quantity: trimmedQty || null,
+  });
+  if (srcErr) return { ok: false, error: srcErr.message };
+  revalidatePath("/shopping");
+  return { ok: true };
+}
+
 // Finish shopping:
 //   1. Record every bought item in purchase_history (one row per bought item).
 //   2. Delete the bought rows (purchased, consumed).
@@ -148,12 +179,18 @@ export async function finishShoppingAction(): Promise<ActionResult> {
     .eq("state", "bought");
   if (fetchErr) return { ok: false, error: fetchErr.message };
 
-  if (boughtRows && boughtRows.length > 0) {
-    const historyRows = boughtRows.map((r) => ({
+  // Only record purchase history for ingredient-backed items — one-off rows
+  // (name only, no ingredient) are not tracked over time.
+  const historyRows = (boughtRows ?? [])
+    .filter((r): r is { ingredient_id: string; quantity: string | null } =>
+      r.ingredient_id != null,
+    )
+    .map((r) => ({
       ingredient_id: r.ingredient_id,
       quantity: r.quantity,
       purchased_at: nowIso,
     }));
+  if (historyRows.length > 0) {
     const { error: histErr } = await supabase.from("purchase_history").insert(historyRows);
     if (histErr) return { ok: false, error: histErr.message };
   }

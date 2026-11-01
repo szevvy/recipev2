@@ -52,7 +52,8 @@ export type ShoppingItemState = "not_checked" | "to_buy" | "have" | "bought";
 
 export type ShoppingItem = {
   id: string;
-  ingredient_id: string;
+  ingredient_id: string | null;
+  name: string | null;
   quantity: string | null;
   source: ShoppingItemSource;
   source_ref: string | null;

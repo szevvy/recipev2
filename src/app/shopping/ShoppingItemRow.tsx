@@ -64,9 +64,10 @@ export function ShoppingItemRow({
   const notes = item.notes?.trim() ?? "";
 
   const expandedRingStyle = expanded && accent
-    ? { backgroundColor: `${accent.chipBg}cc`, boxShadow: `inset 0 0 0 1px ${accent.chipText}33` }
+    ? { backgroundColor: `${accent.chipBg}8f`, boxShadow: `inset 0 0 0 1px ${accent.chipText}26` }
     : undefined;
   const hoverTintClass = accent ? "" : " hover:bg-[var(--surface-muted)]";
+  const nameStyle = accent ? { color: `${accent.chipText}d9` } : undefined;
 
   return (
     <li
@@ -84,7 +85,7 @@ export function ShoppingItemRow({
         }
         onMouseEnter={(e) => {
           if (!expanded && accent) {
-            (e.currentTarget as HTMLDivElement).style.backgroundColor = `${accent.chipBg}aa`;
+            (e.currentTarget as HTMLDivElement).style.backgroundColor = `${accent.chipBg}77`;
           }
         }}
         onMouseLeave={(e) => {
@@ -105,12 +106,11 @@ export function ShoppingItemRow({
         />
         <div className="flex-1 min-w-0">
           <span
-            className={
-              "text-sm text-[var(--foreground)] " + (isBought ? "line-through" : "")
-            }
+            className={"text-sm " + (isBought ? "line-through" : "")}
+            style={nameStyle ?? { color: "var(--foreground)" }}
           >
             {item.quantity ? <span className="font-medium">{item.quantity} </span> : null}
-            {item.ingredients?.name ?? "(unknown)"}
+            {item.ingredients?.name ?? item.name ?? "(unknown)"}
           </span>
           {item.source !== "meal" && (
             <span
@@ -259,7 +259,7 @@ export function HaveRow({ item }: { item: ShoppingItemWithIngredient }) {
       <Home size={12} className="text-[var(--sage)]/70 shrink-0" />
       <span className="flex-1 truncate text-[var(--muted)]">
         {item.quantity ? <span>{item.quantity} </span> : null}
-        {item.ingredients?.name ?? "(unknown)"}
+        {item.ingredients?.name ?? item.name ?? "(unknown)"}
       </span>
       <button
         type="button"

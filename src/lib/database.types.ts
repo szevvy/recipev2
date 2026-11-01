@@ -98,7 +98,8 @@ export type Database = {
         Row: ShoppingItem;
         Insert: {
           id?: string;
-          ingredient_id: string;
+          ingredient_id?: string | null;
+          name?: string | null;
           quantity?: string | null;
           source: ShoppingItemSource;
           source_ref?: string | null;
@@ -107,6 +108,7 @@ export type Database = {
           unit_key?: string | null;
         };
         Update: {
+          name?: string | null;
           quantity?: string | null;
           state?: ShoppingItemState;
           notes?: string | null;

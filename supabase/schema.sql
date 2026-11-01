@@ -70,9 +70,12 @@ create index meal_plan_date_idx on meal_plan (date);
 -- are preserved. `quantity` is free text; parser in src/lib/quantity.ts.
 -- unit_key: normalized unit from the merge (e.g. 'cup', 'can', null). Same
 -- ingredient with different units yields separate rows, keyed by this.
+-- name: display name for one-off items that don't link to an ingredient
+-- (blown light bulb, batteries). A row must have ingredient_id OR name.
 create table shopping_items (
   id uuid primary key default gen_random_uuid(),
-  ingredient_id uuid not null references ingredients(id) on delete cascade,
+  ingredient_id uuid references ingredients(id) on delete cascade,
+  name text,
   quantity text,
   source text not null check (source in ('meal', 'staple', 'manual')),
   source_ref uuid,
@@ -80,7 +83,9 @@ create table shopping_items (
     check (state in ('not_checked', 'to_buy', 'have', 'bought')),
   notes text,
   unit_key text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint shopping_items_name_or_ingredient
+    check (ingredient_id is not null or name is not null)
 );
 create index shopping_items_ingredient_idx on shopping_items (ingredient_id);
 create index shopping_items_state_idx on shopping_items (state);

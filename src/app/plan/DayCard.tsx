@@ -38,6 +38,22 @@ export function DayCard({
     const recipe = recipes.find((r) => r.id === recipeId);
     if (!recipe) return;
     const previous = mealLocal;
+
+    // If replacing an existing meal, ask whether to also remove its ingredients
+    // from the shopping list. Only prompt when there's actually an old recipe
+    // and we're changing to something different.
+    let removeOldIngredients = false;
+    if (
+      previous &&
+      previous.recipes &&
+      previous.recipes.id !== recipeId &&
+      typeof window !== "undefined"
+    ) {
+      removeOldIngredients = window.confirm(
+        `Replace "${previous.recipes.name}" with "${recipe.name}". Also remove its ingredients from the shopping list?`,
+      );
+    }
+
     const optimistic: MealPlanWithRecipe = {
       id: previous?.id ?? `temp-${Date.now()}`,
       date: dateIso,
@@ -57,7 +73,7 @@ export function DayCard({
     setPicking(false);
     setError(null);
     startTransition(async () => {
-      const result = await setMealAction(dateIso, recipeId);
+      const result = await setMealAction(dateIso, recipeId, undefined, removeOldIngredients);
       if (!result.ok) {
         setMealLocal(previous);
         setError(result.error);
@@ -67,10 +83,19 @@ export function DayCard({
 
   function clear() {
     const previous = mealLocal;
+    if (!previous) return;
+
+    const removeIngredients =
+      typeof window !== "undefined"
+        ? window.confirm(
+            `Remove "${previous.recipes?.name ?? "this meal"}". Also remove its ingredients from the shopping list?`,
+          )
+        : false;
+
     setMealLocal(null);
     setError(null);
     startTransition(async () => {
-      const result = await clearMealAction(dateIso);
+      const result = await clearMealAction(dateIso, removeIngredients);
       if (!result.ok) {
         setMealLocal(previous);
         setError(result.error);

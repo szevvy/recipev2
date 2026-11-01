@@ -17,21 +17,21 @@ export function AddManualItem({ ingredients }: { ingredients: Ingredient[] }) {
 
   function submit() {
     const typed = query.trim();
+    if (!typed) {
+      setError("Type something to add");
+      return;
+    }
     const currentQty = quantity;
+
+    // Case-insensitive match against the library — typing "GARLIC" matches "Garlic".
+    const typedLower = typed.toLowerCase();
+    const matched = library.find((i) => i.name.toLowerCase() === typedLower);
 
     setError(null);
     startTransition(async () => {
-      let result;
-      if (ingredientId && typed === library.find((i) => i.id === ingredientId)?.name) {
-        // Current picker value matches a real ingredient — add as ingredient-backed.
-        result = await addManualItemAction(ingredientId, currentQty);
-      } else if (typed) {
-        // User typed something that didn't match (or edited after picking) — one-off.
-        result = await addOneOffItemAction(typed, currentQty);
-      } else {
-        setError("Type something to add");
-        return;
-      }
+      const result = matched
+        ? await addManualItemAction(matched.id, currentQty)
+        : await addOneOffItemAction(typed, currentQty);
 
       if (!result.ok) {
         setError(result.error);

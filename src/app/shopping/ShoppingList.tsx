@@ -1,12 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import type { ShoppingItemWithIngredient } from "@/lib/types";
+import { paletteColor } from "@/lib/category-palette";
+import type { CategoryMetaRow, ShoppingItemWithIngredient } from "@/lib/types";
 import { ShoppingItemRow } from "./ShoppingItemRow";
 
 const UNGROUPED = "__ungrouped__";
 
-export function ShoppingList({ items }: { items: ShoppingItemWithIngredient[] }) {
+export function ShoppingList({
+  items,
+  categoryMeta,
+}: {
+  items: ShoppingItemWithIngredient[];
+  categoryMeta: CategoryMetaRow[];
+}) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (items.length === 0) {
@@ -17,6 +24,9 @@ export function ShoppingList({ items }: { items: ShoppingItemWithIngredient[] })
       </p>
     );
   }
+
+  const metaByName = new Map<string, CategoryMetaRow>();
+  for (const m of categoryMeta) metaByName.set(m.name, m);
 
   const byGroup = new Map<string, ShoppingItemWithIngredient[]>();
   for (const item of items) {
@@ -35,10 +45,14 @@ export function ShoppingList({ items }: { items: ShoppingItemWithIngredient[] })
       return an.localeCompare(bn);
     });
   }
-  const groupKeys = Array.from(byGroup.keys())
-    .filter((k) => k !== UNGROUPED)
-    .sort((a, b) => a.localeCompare(b));
-  if (byGroup.has(UNGROUPED)) groupKeys.push(UNGROUPED);
+  const groupKeys = Array.from(byGroup.keys()).sort((a, b) => {
+    if (a === UNGROUPED) return 1;
+    if (b === UNGROUPED) return -1;
+    const sa = metaByName.get(a)?.sort_order ?? 1_000_000;
+    const sb = metaByName.get(b)?.sort_order ?? 1_000_000;
+    if (sa !== sb) return sa - sb;
+    return a.localeCompare(b);
+  });
 
   function toggle(id: string) {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -49,11 +63,24 @@ export function ShoppingList({ items }: { items: ShoppingItemWithIngredient[] })
       {groupKeys.map((key) => {
         const label = key === UNGROUPED ? "Other" : key;
         const bucket = byGroup.get(key) ?? [];
+        const color = paletteColor(metaByName.get(key)?.color ?? null);
+        const headerStyle = color
+          ? { backgroundColor: color.chipBg, color: color.chipText }
+          : undefined;
         return (
           <section key={key} className="space-y-1">
-            <h3 className="font-serif text-sm uppercase tracking-wide text-[var(--accent)]">
+            <h3
+              className={
+                "inline-flex items-center font-serif text-sm uppercase tracking-wide px-2.5 py-0.5 rounded-full " +
+                (color ? "" : "text-[var(--accent)]")
+              }
+              style={headerStyle}
+            >
               {label}
-              <span className="ml-2 text-xs font-sans text-[var(--muted)] normal-case font-normal">
+              <span
+                className="ml-2 text-xs font-sans normal-case font-normal opacity-70"
+                style={color ? { color: color.chipText } : undefined}
+              >
                 ({bucket.length})
               </span>
             </h3>

@@ -125,6 +125,16 @@ create table purchase_history (
 );
 create index purchase_history_ingredient_idx on purchase_history (ingredient_id, purchased_at desc);
 
+-- Category metadata (color + sort_order). Keyed by group_name text.
+-- Categories themselves still emerge from ingredients.group_name — this is just
+-- extra customization attached to names when they exist.
+create table category_meta (
+  name text primary key,
+  color text,
+  sort_order int not null default 0,
+  updated_at timestamptz not null default now()
+);
+
 -- Lock down direct client access. All reads/writes go through the server
 -- (service_role key) after the shared-password cookie check in middleware.
 alter table ingredients enable row level security;
@@ -134,4 +144,5 @@ alter table meal_plan enable row level security;
 alter table shopping_items enable row level security;
 alter table shopping_item_sources enable row level security;
 alter table purchase_history enable row level security;
+alter table category_meta enable row level security;
 alter table app_settings enable row level security;

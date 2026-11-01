@@ -2,7 +2,11 @@ import { connection } from "next/server";
 import { AppHeader } from "@/components/AppHeader";
 import { supabaseAdmin } from "@/lib/supabase";
 import { syncShoppingList } from "@/lib/shopping-sync";
-import type { Ingredient, ShoppingItemWithIngredient } from "@/lib/types";
+import type {
+  CategoryMetaRow,
+  Ingredient,
+  ShoppingItemWithIngredient,
+} from "@/lib/types";
 import { AddManualItem } from "./AddManualItem";
 import { FinishShoppingButton } from "./FinishShoppingButton";
 import { HaveSection } from "./HaveSection";
@@ -16,7 +20,7 @@ export default async function ShoppingPage() {
   await syncShoppingList();
 
   const supabase = supabaseAdmin();
-  const [itemsResp, ingredientsResp] = await Promise.all([
+  const [itemsResp, ingredientsResp, metaResp] = await Promise.all([
     supabase
       .from("shopping_items")
       .select(
@@ -24,6 +28,7 @@ export default async function ShoppingPage() {
       )
       .order("created_at"),
     supabase.from("ingredients").select("*").order("name"),
+    supabase.from("category_meta").select("*"),
   ]);
 
   if (itemsResp.error || ingredientsResp.error) {
@@ -40,6 +45,7 @@ export default async function ShoppingPage() {
 
   const items = (itemsResp.data ?? []) as unknown as ShoppingItemWithIngredient[];
   const ingredients = (ingredientsResp.data ?? []) as unknown as Ingredient[];
+  const categoryMeta = (metaResp.data ?? []) as unknown as CategoryMetaRow[];
 
   const active = items.filter((i) => i.state !== "have");
   const have = items.filter((i) => i.state === "have");
@@ -83,7 +89,7 @@ export default async function ShoppingPage() {
       </div>
 
       <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-4">
-        <ShoppingList items={active} />
+        <ShoppingList items={active} categoryMeta={categoryMeta} />
       </section>
 
       <StaplesSection staples={staples} />

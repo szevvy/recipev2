@@ -91,6 +91,13 @@ export type PurchaseHistoryRow = {
   purchased_at: string;
 };
 
+export type CategoryMetaRow = {
+  name: string;
+  color: string | null;
+  sort_order: number;
+  updated_at: string;
+};
+
 export type RecipeWithIngredients = Recipe & {
   recipe_ingredients: (RecipeIngredient & { ingredients: Pick<Ingredient, "id" | "name"> })[];
 };

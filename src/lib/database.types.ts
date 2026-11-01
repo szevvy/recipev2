@@ -1,5 +1,6 @@
 import type {
   AppSettings,
+  CategoryMetaRow,
   Ingredient,
   MealPlanEntry,
   PurchaseHistoryRow,
@@ -136,6 +137,19 @@ export type Database = {
         Update: {
           quantity?: string | null;
           purchased_at?: string;
+        };
+        Relationships: [];
+      };
+      category_meta: {
+        Row: CategoryMetaRow;
+        Insert: {
+          name: string;
+          color?: string | null;
+          sort_order?: number;
+        };
+        Update: {
+          color?: string | null;
+          sort_order?: number;
         };
         Relationships: [];
       };

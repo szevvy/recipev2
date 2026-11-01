@@ -3,10 +3,10 @@ import { HeaderMenu } from "./HeaderMenu";
 
 const navItems: { href: string; label: string; disabled?: boolean }[] = [
   { href: "/", label: "Home" },
-  { href: "/ingredients", label: "Ingredients" },
-  { href: "/recipes", label: "Recipes" },
-  { href: "/plan", label: "Plan" },
   { href: "/shopping", label: "Shopping" },
+  { href: "/plan", label: "Plan" },
+  { href: "/recipes", label: "Recipes" },
+  { href: "/ingredients", label: "Ingredients" },
 ];
 
 export function AppHeader({ current }: { current: string }) {

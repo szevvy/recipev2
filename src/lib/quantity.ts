@@ -116,19 +116,27 @@ export type MergeInput = {
 export type MergeOutput = {
   ingredient_id: string;
   quantity: string | null;
+  // The merge key — same ingredient with different units produces separate
+  // rows, each with their own unit_key. null means the quantity didn't have
+  // a unit (e.g. "2") or wasn't parseable.
+  unit_key: string | null;
 };
 
 export function mergeShoppingItems(inputs: MergeInput[]): MergeOutput[] {
   type Bucket = { qty: number; unit: string | null };
   const parsedBuckets = new Map<string, Bucket>();
   const unparsed: MergeOutput[] = [];
+  let unparsedIdx = 0;
 
   for (const item of inputs) {
     const parsed = parseQuantity(item.quantity);
     if (parsed.qty == null) {
+      // Each unparseable gets its own row (we can't sum them). Give each a
+      // unique unit_key so sync can treat them as distinct buckets.
       unparsed.push({
         ingredient_id: item.ingredient_id,
         quantity: parsed.raw || null,
+        unit_key: `_raw_${unparsedIdx++}`,
       });
       continue;
     }
@@ -148,6 +156,7 @@ export function mergeShoppingItems(inputs: MergeInput[]): MergeOutput[] {
     merged.push({
       ingredient_id,
       quantity: formatQuantity(bucket.qty, bucket.unit) || null,
+      unit_key: bucket.unit,
     });
   }
 

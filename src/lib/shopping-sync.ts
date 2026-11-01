@@ -14,18 +14,16 @@ import type { ShoppingItemState } from "./types";
 //  * Rows with state='not_checked' or 'to_buy' and source='meal' are refreshed
 //    from the current (unshopped) meal plan: quantity gets re-merged.
 //  * Meals with shopped_at IS NOT NULL are skipped (already shopped-for).
-//  * No orphan deletion — forgotten items stay until the user removes them.
-//  * Each meal shopping_items row gets fresh shopping_item_sources rows so the
-//    expand UI can show which recipes contributed what.
+//  * Each merged (ingredient_id, unit) bucket maps to one shopping_items row,
+//    keyed by (ingredient_id, source='meal', unit_key).
+//  * Orphan rows (unmatched to the new merged list AND no sources) get deleted.
+//  * Each meal row's shopping_item_sources are rebuilt per sync.
 //
-// Performance: the whole sync is a fixed small number of round-trips regardless
-// of how many ingredients or meals you have (bulk inserts/deletes, Promise.all
-// for independent fetches).
+// Performance: fixed small number of parallel/bulk queries regardless of count.
 export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = supabaseAdmin();
   const today = new Date().toISOString().slice(0, 10);
 
-  // Run the three independent reads in parallel.
   const [mealsResp, existingMealResp, statefulResp] = await Promise.all([
     supabase
       .from("meal_plan")
@@ -36,7 +34,7 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
       .is("shopped_at", null),
     supabase
       .from("shopping_items")
-      .select("id, ingredient_id, quantity, state")
+      .select("id, ingredient_id, quantity, state, unit_key")
       .eq("source", "meal")
       .in("state", ["not_checked", "to_buy"]),
     supabase
@@ -61,9 +59,9 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
     } | null;
   }>;
 
-  // Build merge inputs + per-ingredient contribution list in one pass.
+  // Build merge inputs + per (ingredient_id, unit_key) contribution list.
   type Contribution = { meal_plan_id: string; quantity: string | null };
-  const contributionsByIngredient = new Map<string, Contribution[]>();
+  const contributionsByBucket = new Map<string, Contribution[]>();
   const mergeInputs: MergeInput[] = [];
   for (const meal of meals) {
     if (!meal.recipes) continue;
@@ -82,107 +80,137 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
         scaled.qty != null
           ? formatQuantity(scaled.qty, scaled.unit) || null
           : scaled.raw || null;
-
-      const list = contributionsByIngredient.get(ri.ingredient_id) ?? [];
+      const bucketKey = `${ri.ingredient_id}|${scaled.unit ?? ""}`;
+      const list = contributionsByBucket.get(bucketKey) ?? [];
       list.push({ meal_plan_id: meal.id, quantity: scaledText });
-      contributionsByIngredient.set(ri.ingredient_id, list);
+      contributionsByBucket.set(bucketKey, list);
     }
   }
   const mergedMeal = mergeShoppingItems(mergeInputs);
 
-  const existingByIngredient = new Map<
+  const existingByBucket = new Map<
     string,
-    { id: string; quantity: string | null; state: ShoppingItemState }
+    { id: string; quantity: string | null; state: ShoppingItemState; unit_key: string | null }
   >();
   for (const row of existingMealResp.data ?? []) {
-    existingByIngredient.set(row.ingredient_id, {
+    const key = `${row.ingredient_id}|${row.unit_key ?? ""}`;
+    existingByBucket.set(key, {
       id: row.id,
       quantity: row.quantity,
       state: row.state,
+      unit_key: row.unit_key,
     });
   }
   const statefulIngredients = new Set(
     (statefulResp.data ?? []).map((r) => r.ingredient_id),
   );
 
-  // Partition into inserts vs updates. Items the user has already decided on
-  // (have/bought) are skipped entirely.
+  // Partition into inserts vs updates. Also track which existing ids got matched
+  // so we can detect orphans at the end.
   const toInsert: Array<{
     ingredient_id: string;
     quantity: string | null;
+    unit_key: string | null;
     source: "meal";
     state: "not_checked";
   }> = [];
-  const toUpdate: Array<{ id: string; quantity: string | null }> = [];
-  const touchedExistingIds: string[] = [];
+  const toUpdate: Array<{ id: string; quantity: string | null; unit_key: string | null }> = [];
+  const matchedExistingIds = new Set<string>();
 
   for (const m of mergedMeal) {
     if (statefulIngredients.has(m.ingredient_id)) continue;
-    const existing = existingByIngredient.get(m.ingredient_id);
+    const bucketKey = `${m.ingredient_id}|${m.unit_key ?? ""}`;
+    const existing = existingByBucket.get(bucketKey);
     if (existing) {
-      touchedExistingIds.push(existing.id);
-      if (existing.quantity !== m.quantity) {
-        toUpdate.push({ id: existing.id, quantity: m.quantity });
+      matchedExistingIds.add(existing.id);
+      if (existing.quantity !== m.quantity || existing.unit_key !== m.unit_key) {
+        toUpdate.push({ id: existing.id, quantity: m.quantity, unit_key: m.unit_key });
       }
     } else {
       toInsert.push({
         ingredient_id: m.ingredient_id,
         quantity: m.quantity,
+        unit_key: m.unit_key,
         source: "meal",
         state: "not_checked",
       });
     }
   }
 
-  // Bulk insert new rows (one query, returns ids) + parallel quantity updates.
+  // Detect orphan existing rows (meal, in to_buy/not_checked, unmatched by any
+  // merged bucket). We only delete the ones with no sources, to protect any
+  // row that might represent a now-removed meal the user hasn't dealt with yet.
+  const unmatched = (existingMealResp.data ?? []).filter(
+    (row) => !matchedExistingIds.has(row.id),
+  );
+  let orphanToDelete: string[] = [];
+  if (unmatched.length > 0) {
+    const unmatchedIds = unmatched.map((r) => r.id);
+    const { data: withSources } = await supabase
+      .from("shopping_item_sources")
+      .select("shopping_item_id")
+      .in("shopping_item_id", unmatchedIds);
+    const hasSources = new Set((withSources ?? []).map((s) => s.shopping_item_id));
+    orphanToDelete = unmatchedIds.filter((id) => !hasSources.has(id));
+  }
+
+  // Fire off the mutations.
   const insertPromise =
     toInsert.length > 0
-      ? supabase.from("shopping_items").insert(toInsert).select("id, ingredient_id")
-      : Promise.resolve({ data: [] as { id: string; ingredient_id: string }[], error: null });
+      ? supabase
+          .from("shopping_items")
+          .insert(toInsert)
+          .select("id, ingredient_id, unit_key")
+      : Promise.resolve({ data: [] as Array<{ id: string; ingredient_id: string; unit_key: string | null }>, error: null });
 
   const updatePromises = toUpdate.map((u) =>
-    supabase.from("shopping_items").update({ quantity: u.quantity }).eq("id", u.id),
+    supabase
+      .from("shopping_items")
+      .update({ quantity: u.quantity, unit_key: u.unit_key })
+      .eq("id", u.id),
   );
 
-  const [insertResult, ...updateResults] = await Promise.all([insertPromise, ...updatePromises]);
+  const orphanDeletePromise =
+    orphanToDelete.length > 0
+      ? supabase.from("shopping_items").delete().in("id", orphanToDelete)
+      : Promise.resolve({ error: null });
+
+  const [insertResult, orphanResult, ...updateResults] = await Promise.all([
+    insertPromise,
+    orphanDeletePromise,
+    ...updatePromises,
+  ]);
 
   if (insertResult.error) return { ok: false, error: insertResult.error.message };
+  if (orphanResult.error) return { ok: false, error: orphanResult.error.message };
   for (const r of updateResults) {
     if (r.error) return { ok: false, error: r.error.message };
   }
 
-  const newIdByIngredient = new Map<string, string>();
+  // Build (ingredient_id, unit_key) -> shopping_item_id for every synced bucket.
+  const idByBucket = new Map<string, string>();
   for (const row of insertResult.data ?? []) {
-    newIdByIngredient.set(row.ingredient_id, row.id);
+    idByBucket.set(`${row.ingredient_id}|${row.unit_key ?? ""}`, row.id);
   }
-
-  // Resolve ingredient_id -> shopping_item_id for every synced item.
-  const idByIngredient = new Map<string, string>();
   for (const m of mergedMeal) {
     if (statefulIngredients.has(m.ingredient_id)) continue;
-    const newId = newIdByIngredient.get(m.ingredient_id);
-    if (newId) {
-      idByIngredient.set(m.ingredient_id, newId);
-    } else {
-      const existing = existingByIngredient.get(m.ingredient_id);
-      if (existing) idByIngredient.set(m.ingredient_id, existing.id);
-    }
+    const key = `${m.ingredient_id}|${m.unit_key ?? ""}`;
+    if (idByBucket.has(key)) continue;
+    const existing = existingByBucket.get(key);
+    if (existing) idByBucket.set(key, existing.id);
   }
 
-  const allTouchedIds = [
-    ...touchedExistingIds,
-    ...Array.from(newIdByIngredient.values()),
-  ];
+  const allTouchedIds = Array.from(idByBucket.values());
 
-  // Bulk refresh meal sources: one delete + one insert.
+  // Rebuild meal-kind sources in bulk.
   const sourceRows: Array<{
     shopping_item_id: string;
     kind: "meal";
     meal_plan_id: string;
     quantity: string | null;
   }> = [];
-  for (const [ingredientId, contribs] of contributionsByIngredient) {
-    const itemId = idByIngredient.get(ingredientId);
+  for (const [bucketKey, contribs] of contributionsByBucket) {
+    const itemId = idByBucket.get(bucketKey);
     if (!itemId) continue;
     for (const c of contribs) {
       sourceRows.push({
@@ -194,22 +222,18 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
     }
   }
 
-  const sourceDeletePromise =
-    allTouchedIds.length > 0
-      ? supabase
-          .from("shopping_item_sources")
-          .delete()
-          .in("shopping_item_id", allTouchedIds)
-          .eq("kind", "meal")
-      : Promise.resolve({ error: null });
-
-  // Delete first, then insert — if we race them, the delete might wipe the inserts.
-  const delResult = await sourceDeletePromise;
-  if (delResult.error) return { ok: false, error: delResult.error.message };
+  if (allTouchedIds.length > 0) {
+    const { error } = await supabase
+      .from("shopping_item_sources")
+      .delete()
+      .in("shopping_item_id", allTouchedIds)
+      .eq("kind", "meal");
+    if (error) return { ok: false, error: error.message };
+  }
 
   if (sourceRows.length > 0) {
-    const { error: insErr } = await supabase.from("shopping_item_sources").insert(sourceRows);
-    if (insErr) return { ok: false, error: insErr.message };
+    const { error } = await supabase.from("shopping_item_sources").insert(sourceRows);
+    if (error) return { ok: false, error: error.message };
   }
 
   return { ok: true };

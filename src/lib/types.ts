@@ -58,6 +58,7 @@ export type ShoppingItem = {
   source_ref: string | null;
   state: ShoppingItemState;
   notes: string | null;
+  unit_key: string | null;
   created_at: string;
 };
 

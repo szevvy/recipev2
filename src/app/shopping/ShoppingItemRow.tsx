@@ -11,14 +11,18 @@ import {
 } from "./actions";
 import { StatePicker } from "./StatePicker";
 
+export type RowAccent = { chipBg: string; chipText: string } | null;
+
 export function ShoppingItemRow({
   item,
   expanded,
   onToggleExpand,
+  accent,
 }: {
   item: ShoppingItemWithIngredient;
   expanded: boolean;
   onToggleExpand: () => void;
+  accent?: RowAccent;
 }) {
   const [state, setState] = useState<ShoppingItemState>(item.state);
   const [removed, setRemoved] = useState(false);
@@ -59,19 +63,35 @@ export function ShoppingItemRow({
   const isBought = state === "bought";
   const notes = item.notes?.trim() ?? "";
 
+  const expandedRingStyle = expanded && accent
+    ? { backgroundColor: `${accent.chipBg}cc`, boxShadow: `inset 0 0 0 1px ${accent.chipText}33` }
+    : undefined;
+  const hoverTintClass = accent ? "" : " hover:bg-[var(--surface-muted)]";
+
   return (
     <li
       className={
         "rounded-lg transition-colors " +
-        (expanded ? "bg-[var(--accent-soft)]/40 ring-1 ring-[var(--accent)]/20" : "")
+        (expanded && !accent ? "bg-[var(--accent-soft)]/40 ring-1 ring-[var(--accent)]/20" : "")
       }
+      style={expandedRingStyle}
     >
       <div
         className={
           "flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors cursor-pointer " +
           (isBought ? "opacity-50" : "") +
-          (expanded ? "" : " hover:bg-[var(--surface-muted)]")
+          (expanded ? "" : hoverTintClass)
         }
+        onMouseEnter={(e) => {
+          if (!expanded && accent) {
+            (e.currentTarget as HTMLDivElement).style.backgroundColor = `${accent.chipBg}aa`;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (accent) {
+            (e.currentTarget as HTMLDivElement).style.backgroundColor = "";
+          }
+        }}
         onClick={(e) => {
           // Only expand/collapse when clicking the "body" area, not when a nested
           // interactive (bought check, picker chevron) was clicked.

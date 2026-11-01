@@ -68,6 +68,8 @@ create index meal_plan_date_idx on meal_plan (date);
 --   state=bought       ✓ — purchased this trip (deleted on Finish shopping)
 -- Source is 'meal' | 'staple' | 'manual'. On sync, rows with any user-set state
 -- are preserved. `quantity` is free text; parser in src/lib/quantity.ts.
+-- unit_key: normalized unit from the merge (e.g. 'cup', 'can', null). Same
+-- ingredient with different units yields separate rows, keyed by this.
 create table shopping_items (
   id uuid primary key default gen_random_uuid(),
   ingredient_id uuid not null references ingredients(id) on delete cascade,
@@ -76,6 +78,8 @@ create table shopping_items (
   source_ref uuid,
   state text not null default 'not_checked'
     check (state in ('not_checked', 'to_buy', 'have', 'bought')),
+  notes text,
+  unit_key text,
   created_at timestamptz not null default now()
 );
 create index shopping_items_ingredient_idx on shopping_items (ingredient_id);

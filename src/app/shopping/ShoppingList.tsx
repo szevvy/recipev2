@@ -67,6 +67,10 @@ export function ShoppingList({
         const headerStyle = color
           ? { backgroundColor: color.chipBg, color: color.chipText }
           : undefined;
+        const ulStyle = color
+          ? { backgroundColor: `${color.chipBg}66`, borderColor: `${color.chipText}1a` }
+          : undefined;
+        const divideBorder = color ? `${color.chipText}1a` : undefined;
         return (
           <section key={key} className="space-y-1">
             <h3
@@ -84,14 +88,29 @@ export function ShoppingList({
                 ({bucket.length})
               </span>
             </h3>
-            <ul className="divide-y divide-[var(--border)]/60 bg-[var(--surface-muted)]/60 rounded-xl p-1">
-              {bucket.map((item) => (
-                <ShoppingItemRow
+            <ul
+              className={
+                "rounded-xl p-1 border " +
+                (color ? "" : "bg-[var(--surface-muted)]/60 border-transparent divide-y divide-[var(--border)]/60")
+              }
+              style={ulStyle}
+            >
+              {bucket.map((item, idx) => (
+                <div
                   key={item.id}
-                  item={item}
-                  expanded={expandedId === item.id}
-                  onToggleExpand={() => toggle(item.id)}
-                />
+                  style={
+                    color && idx > 0
+                      ? { borderTop: `1px solid ${divideBorder}` }
+                      : undefined
+                  }
+                >
+                  <ShoppingItemRow
+                    item={item}
+                    expanded={expandedId === item.id}
+                    onToggleExpand={() => toggle(item.id)}
+                    accent={color ? { chipBg: color.chipBg, chipText: color.chipText } : null}
+                  />
+                </div>
               ))}
             </ul>
           </section>

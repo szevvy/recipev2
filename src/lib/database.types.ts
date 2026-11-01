@@ -104,11 +104,13 @@ export type Database = {
           source_ref?: string | null;
           state?: ShoppingItemState;
           notes?: string | null;
+          unit_key?: string | null;
         };
         Update: {
           quantity?: string | null;
           state?: ShoppingItemState;
           notes?: string | null;
+          unit_key?: string | null;
         };
         Relationships: [];
       };

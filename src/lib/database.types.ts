@@ -2,6 +2,7 @@ import type {
   AppSettings,
   Ingredient,
   MealPlanEntry,
+  PurchaseHistoryRow,
   Recipe,
   RecipeIngredient,
   ShoppingItem,
@@ -121,6 +122,20 @@ export type Database = {
         };
         Update: {
           quantity?: string | null;
+        };
+        Relationships: [];
+      };
+      purchase_history: {
+        Row: PurchaseHistoryRow;
+        Insert: {
+          id?: string;
+          ingredient_id: string;
+          quantity?: string | null;
+          purchased_at?: string;
+        };
+        Update: {
+          quantity?: string | null;
+          purchased_at?: string;
         };
         Relationships: [];
       };

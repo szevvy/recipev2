@@ -132,14 +132,31 @@ export async function addManualItemAction(
 }
 
 // Finish shopping:
-//   1. Delete rows with state='bought' (purchased)
-//   2. Reset remaining staple rows to 'not_checked' so next trip starts fresh
-//      (meal/manual rows keep their state — forgotten items persist)
-//   3. Stamp current (unshopped) meal_plan entries so sync won't re-add their items
+//   1. Record every bought item in purchase_history (one row per bought item).
+//   2. Delete the bought rows (purchased, consumed).
+//   3. Reset remaining staple rows to 'not_checked' so next trip starts fresh
+//      (meal/manual rows keep their state — forgotten items persist).
+//   4. Stamp current (unshopped) meal_plan entries so sync won't re-add their items.
 export async function finishShoppingAction(): Promise<ActionResult> {
   const supabase = supabaseAdmin();
   const today = new Date().toISOString().slice(0, 10);
   const nowIso = new Date().toISOString();
+
+  const { data: boughtRows, error: fetchErr } = await supabase
+    .from("shopping_items")
+    .select("ingredient_id, quantity")
+    .eq("state", "bought");
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+
+  if (boughtRows && boughtRows.length > 0) {
+    const historyRows = boughtRows.map((r) => ({
+      ingredient_id: r.ingredient_id,
+      quantity: r.quantity,
+      purchased_at: nowIso,
+    }));
+    const { error: histErr } = await supabase.from("purchase_history").insert(historyRows);
+    if (histErr) return { ok: false, error: histErr.message };
+  }
 
   const { error: delErr } = await supabase
     .from("shopping_items")

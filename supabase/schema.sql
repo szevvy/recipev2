@@ -103,6 +103,28 @@ create table app_settings (
 );
 insert into app_settings (id) values (1) on conflict do nothing;
 
+-- Shopping item sources: tracks what contributed to each merged row
+-- (recipes, staples, manual) so the expand view can show the breakdown.
+create table shopping_item_sources (
+  id uuid primary key default gen_random_uuid(),
+  shopping_item_id uuid not null references shopping_items(id) on delete cascade,
+  kind text not null check (kind in ('meal', 'staple', 'manual')),
+  meal_plan_id uuid references meal_plan(id) on delete set null,
+  quantity text,
+  created_at timestamptz not null default now()
+);
+create index shopping_item_sources_item_idx on shopping_item_sources (shopping_item_id);
+
+-- Purchase history: one row per bought item per shopping trip, so we can
+-- learn how often we buy things.
+create table purchase_history (
+  id uuid primary key default gen_random_uuid(),
+  ingredient_id uuid not null references ingredients(id) on delete cascade,
+  quantity text,
+  purchased_at timestamptz not null default now()
+);
+create index purchase_history_ingredient_idx on purchase_history (ingredient_id, purchased_at desc);
+
 -- Lock down direct client access. All reads/writes go through the server
 -- (service_role key) after the shared-password cookie check in middleware.
 alter table ingredients enable row level security;
@@ -110,4 +132,6 @@ alter table recipes enable row level security;
 alter table recipe_ingredients enable row level security;
 alter table meal_plan enable row level security;
 alter table shopping_items enable row level security;
+alter table shopping_item_sources enable row level security;
+alter table purchase_history enable row level security;
 alter table app_settings enable row level security;

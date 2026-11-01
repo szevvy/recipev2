@@ -84,6 +84,13 @@ export type ShoppingItemWithIngredient = ShoppingItem & {
   shopping_item_sources: ShoppingItemSourceDetail[];
 };
 
+export type PurchaseHistoryRow = {
+  id: string;
+  ingredient_id: string;
+  quantity: string | null;
+  purchased_at: string;
+};
+
 export type RecipeWithIngredients = Recipe & {
   recipe_ingredients: (RecipeIngredient & { ingredients: Pick<Ingredient, "id" | "name"> })[];
 };

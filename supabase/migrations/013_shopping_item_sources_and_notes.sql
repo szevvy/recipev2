@@ -16,3 +16,7 @@ create table if not exists shopping_item_sources (
 
 create index if not exists shopping_item_sources_item_idx
   on shopping_item_sources (shopping_item_id);
+
+-- All reads/writes go through the server (service_role key); clients using
+-- anon or authenticated keys have no access to this table.
+alter table shopping_item_sources enable row level security;

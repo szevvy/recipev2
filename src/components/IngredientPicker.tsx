@@ -9,11 +9,15 @@ export function IngredientPicker({
   ingredients,
   value,
   onChange,
+  onQueryChange,
+  allowCreate = true,
   placeholder = "Pick an ingredient…",
 }: {
   ingredients: Ingredient[];
   value: string | null;
   onChange: (ing: Ingredient) => void;
+  onQueryChange?: (query: string) => void;
+  allowCreate?: boolean;
   placeholder?: string;
 }) {
   const selected = value ? ingredients.find((i) => i.id === value) ?? null : null;
@@ -26,6 +30,10 @@ export function IngredientPicker({
 
   useEffect(() => {
     setQuery(selected?.name ?? "");
+    if (onQueryChange) onQueryChange(selected?.name ?? "");
+    // Intentionally skip onQueryChange in deps — avoid loops if parent passes
+    // a new function reference each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id, selected?.name]);
 
   useEffect(() => {
@@ -75,6 +83,7 @@ export function IngredientPicker({
         autoComplete="off"
         onChange={(e) => {
           setQuery(e.target.value);
+          if (onQueryChange) onQueryChange(e.target.value);
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
@@ -105,7 +114,7 @@ export function IngredientPicker({
       >
         <ChevronDown size={16} />
       </button>
-      {open && (filtered.length > 0 || (q && !exactMatch)) && (
+      {open && (filtered.length > 0 || (allowCreate && q && !exactMatch)) && (
         <ul className="absolute top-full left-0 right-0 mt-1 max-h-64 overflow-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg z-20 py-1">
           {filtered.slice(0, 50).map((i) => (
             <li key={i.id}>
@@ -121,7 +130,7 @@ export function IngredientPicker({
               </button>
             </li>
           ))}
-          {q && !exactMatch && (
+          {allowCreate && q && !exactMatch && (
             <li className="border-t border-[var(--border)]/70 mt-1 pt-1">
               <button
                 type="button"

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
-import { Plus, Users, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { format, isToday, isPast } from "date-fns";
 import type { MealPlanWithRecipe, Recipe } from "@/lib/types";
 import { clearMealAction, setMealAction } from "./actions";
@@ -120,10 +120,6 @@ export function DayCard({
           >
             <div className="font-medium text-[var(--foreground)] group-hover:text-[var(--accent)] truncate">
               {mealLocal.recipes?.name ?? "(deleted recipe)"}
-            </div>
-            <div className="text-xs text-[var(--muted)] mt-1 inline-flex items-center gap-1">
-              <Users size={11} />
-              {mealLocal.servings ?? mealLocal.recipes?.default_servings ?? "–"}
             </div>
           </button>
         ) : (

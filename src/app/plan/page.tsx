@@ -43,14 +43,14 @@ export default async function PlanPage({ searchParams }: { searchParams: SearchP
       .is("slot", null),
     supabase
       .from("recipes")
-      .select("id, name, image_url, default_servings")
+      .select("id, name, image_url, default_servings, prep_minutes, cook_minutes")
       .order("name", { ascending: true }),
   ]);
 
   const meals = (mealsData ?? []) as unknown as MealPlanWithRecipe[];
   const recipes = (recipesData ?? []) as unknown as Pick<
     Recipe,
-    "id" | "name" | "image_url" | "default_servings"
+    "id" | "name" | "image_url" | "default_servings" | "prep_minutes" | "cook_minutes"
   >[];
 
   const mealByDate = new Map<string, MealPlanWithRecipe>();
@@ -58,8 +58,17 @@ export default async function PlanPage({ searchParams }: { searchParams: SearchP
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
+  // Preload recipe hero images so the picker modal opens with cards fully rendered.
+  const preloadImages = recipes
+    .map((r) => r.image_url)
+    .filter((u): u is string => !!u);
+
   return (
     <main className="min-h-screen p-6 max-w-6xl mx-auto space-y-6">
+      {preloadImages.map((url) => (
+        // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+        <link key={url} rel="preload" as="image" href={url} />
+      ))}
       <AppHeader current="/plan" />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>

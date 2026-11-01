@@ -1,12 +1,25 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, Home } from "lucide-react";
+import { Check, Home, PencilLine, ShoppingBasket, Sparkles, Utensils } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import type { ShoppingItemState, ShoppingItemWithIngredient } from "@/lib/types";
-import { removeShoppingItemAction, setItemStateAction } from "./actions";
+import {
+  removeShoppingItemAction,
+  setItemNotesAction,
+  setItemStateAction,
+} from "./actions";
 import { StatePicker } from "./StatePicker";
 
-export function ShoppingItemRow({ item }: { item: ShoppingItemWithIngredient }) {
+export function ShoppingItemRow({
+  item,
+  expanded,
+  onToggleExpand,
+}: {
+  item: ShoppingItemWithIngredient;
+  expanded: boolean;
+  onToggleExpand: () => void;
+}) {
   const [state, setState] = useState<ShoppingItemState>(item.state);
   const [removed, setRemoved] = useState(false);
   const [, startTransition] = useTransition();
@@ -44,51 +57,66 @@ export function ShoppingItemRow({ item }: { item: ShoppingItemWithIngredient }) 
   if (removed) return null;
 
   const isBought = state === "bought";
+  const notes = item.notes?.trim() ?? "";
 
   return (
     <li
       className={
-        "flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors hover:bg-[var(--surface-muted)]" +
-        (isBought ? " opacity-50" : "")
+        "rounded-lg transition-colors " +
+        (expanded ? "bg-[var(--accent-soft)]/40 ring-1 ring-[var(--accent)]/20" : "")
       }
     >
-      <BoughtButton
-        active={isBought}
-        onClick={() => update(isBought ? "to_buy" : "bought")}
-      />
-      <div className="flex-1 min-w-0">
-        <span
-          className={
-            "text-sm text-[var(--foreground)] " + (isBought ? "line-through" : "")
-          }
-        >
-          {item.quantity ? <span className="font-medium">{item.quantity} </span> : null}
-          {item.ingredients?.name ?? "(unknown)"}
-        </span>
-        {item.source !== "meal" && (
+      <div
+        className={
+          "flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors cursor-pointer " +
+          (isBought ? "opacity-50" : "") +
+          (expanded ? "" : " hover:bg-[var(--surface-muted)]")
+        }
+        onClick={(e) => {
+          // Only expand/collapse when clicking the "body" area, not when a nested
+          // interactive (bought check, picker chevron) was clicked.
+          if ((e.target as HTMLElement).closest("button,input,textarea")) return;
+          onToggleExpand();
+        }}
+      >
+        <BoughtButton
+          active={isBought}
+          onClick={() => update(isBought ? "to_buy" : "bought")}
+        />
+        <div className="flex-1 min-w-0">
           <span
             className={
-              "ml-2 text-[10px] uppercase tracking-wide " +
-              (item.source === "manual" ? "text-[var(--accent)]" : "text-[var(--muted)]")
+              "text-sm text-[var(--foreground)] " + (isBought ? "line-through" : "")
             }
           >
-            {item.source === "manual" ? "added" : "staple"}
+            {item.quantity ? <span className="font-medium">{item.quantity} </span> : null}
+            {item.ingredients?.name ?? "(unknown)"}
           </span>
-        )}
+          {item.source !== "meal" && (
+            <span
+              className={
+                "ml-2 text-[10px] uppercase tracking-wide " +
+                (item.source === "manual" ? "text-[var(--accent)]" : "text-[var(--muted)]")
+              }
+            >
+              {item.source === "manual" ? "added" : "staple"}
+            </span>
+          )}
+          {notes && !expanded && (
+            <div className="text-xs italic text-[var(--muted)] mt-0.5 truncate flex items-center gap-1">
+              <PencilLine size={10} /> {notes}
+            </div>
+          )}
+        </div>
+        {error && <span className="text-xs text-red-600 mr-1">{error}</span>}
+        <StatePicker state={state} onChange={update} onRemove={remove} />
       </div>
-      {error && <span className="text-xs text-red-600 mr-1">{error}</span>}
-      <StatePicker state={state} onChange={update} onRemove={remove} />
+      {expanded && <ExpandedPanel item={item} />}
     </li>
   );
 }
 
-function BoughtButton({
-  active,
-  onClick,
-}: {
-  active: boolean;
-  onClick: () => void;
-}) {
+function BoughtButton({ active, onClick }: { active: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -104,6 +132,88 @@ function BoughtButton({
       <Check size={14} />
     </button>
   );
+}
+
+function ExpandedPanel({ item }: { item: ShoppingItemWithIngredient }) {
+  const [notes, setNotes] = useState(item.notes ?? "");
+  const [saved, setSaved] = useState(false);
+  const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    setNotes(item.notes ?? "");
+  }, [item.notes]);
+
+  function commitNotes() {
+    const nextTrim = notes.trim();
+    const currentTrim = (item.notes ?? "").trim();
+    if (nextTrim === currentTrim) return;
+    startTransition(async () => {
+      const result = await setItemNotesAction(item.id, nextTrim);
+      if (result.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1200);
+      }
+    });
+  }
+
+  const sources = item.shopping_item_sources ?? [];
+
+  return (
+    <div className="px-3 pb-3 pt-1 space-y-3 border-t border-[var(--border)]/60">
+      <label className="block">
+        <span className="text-[10px] uppercase tracking-wide text-[var(--muted)]">
+          Note
+        </span>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          onBlur={commitNotes}
+          rows={2}
+          placeholder="e.g. buy on Thursday"
+          className="mt-0.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
+        />
+        {saved && <span className="text-xs text-[var(--sage)]">Saved.</span>}
+      </label>
+
+      <div>
+        <div className="text-[10px] uppercase tracking-wide text-[var(--muted)] mb-1">
+          Contributions
+        </div>
+        {sources.length === 0 ? (
+          <p className="text-xs italic text-[var(--muted)]">
+            No source info recorded for this row.
+          </p>
+        ) : (
+          <ul className="space-y-1 text-sm">
+            {sources.map((s) => (
+              <li key={s.id} className="flex items-center gap-2 text-[var(--foreground)]">
+                <SourceIcon kind={s.kind} />
+                <span className="font-medium">{s.quantity ?? "–"}</span>
+                <span>{sourceLabel(s)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SourceIcon({ kind }: { kind: "meal" | "staple" | "manual" }) {
+  if (kind === "meal") return <Utensils size={12} className="text-[var(--muted)]" />;
+  if (kind === "staple") return <Sparkles size={12} className="text-[var(--muted)]" />;
+  return <ShoppingBasket size={12} className="text-[var(--accent)]" />;
+}
+
+function sourceLabel(s: ShoppingItemWithIngredient["shopping_item_sources"][number]): string {
+  if (s.kind === "staple") return "from staples";
+  if (s.kind === "manual") return "manually added";
+  const name = s.meal_plan?.recipes?.name;
+  const dateIso = s.meal_plan?.date;
+  const day = dateIso ? format(parseISO(dateIso), "EEE d MMM") : null;
+  if (name && day) return `from ${name} (${day})`;
+  if (name) return `from ${name}`;
+  return "from a planned meal";
 }
 
 export function HaveRow({ item }: { item: ShoppingItemWithIngredient }) {

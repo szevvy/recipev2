@@ -6,6 +6,8 @@ import type {
   RecipeIngredient,
   ShoppingItem,
   ShoppingItemSource,
+  ShoppingItemSourceKind,
+  ShoppingItemSourceRow,
   ShoppingItemState,
   StapleState,
   WeekStart,
@@ -99,10 +101,26 @@ export type Database = {
           source: ShoppingItemSource;
           source_ref?: string | null;
           state?: ShoppingItemState;
+          notes?: string | null;
         };
         Update: {
           quantity?: string | null;
           state?: ShoppingItemState;
+          notes?: string | null;
+        };
+        Relationships: [];
+      };
+      shopping_item_sources: {
+        Row: ShoppingItemSourceRow;
+        Insert: {
+          id?: string;
+          shopping_item_id: string;
+          kind: ShoppingItemSourceKind;
+          meal_plan_id?: string | null;
+          quantity?: string | null;
+        };
+        Update: {
+          quantity?: string | null;
         };
         Relationships: [];
       };

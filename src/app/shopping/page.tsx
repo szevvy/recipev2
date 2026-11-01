@@ -6,12 +6,10 @@ import type { Ingredient, ShoppingItemWithIngredient } from "@/lib/types";
 import { AddManualItem } from "./AddManualItem";
 import { FinishShoppingButton } from "./FinishShoppingButton";
 import { HaveSection } from "./HaveSection";
-import { ShoppingItemRow } from "./ShoppingItemRow";
+import { ShoppingList } from "./ShoppingList";
 import { StaplesSection, type StapleView } from "./StaplesSection";
 
 export const instant = false;
-
-const UNGROUPED = "__ungrouped__";
 
 export default async function ShoppingPage() {
   await connection();
@@ -21,7 +19,9 @@ export default async function ShoppingPage() {
   const [itemsResp, ingredientsResp] = await Promise.all([
     supabase
       .from("shopping_items")
-      .select("*, ingredients(id, name, group_name, is_staple)")
+      .select(
+        "*, ingredients(id, name, group_name, is_staple), shopping_item_sources(id, kind, quantity, meal_plan_id, meal_plan(date, recipes(id, name)))",
+      )
       .order("created_at"),
     supabase.from("ingredients").select("*").order("name"),
   ]);
@@ -44,8 +44,6 @@ export default async function ShoppingPage() {
   const active = items.filter((i) => i.state !== "have");
   const have = items.filter((i) => i.state === "have");
 
-  // Staples section: every is_staple=true ingredient, with its state from the
-  // (optional) matching source='staple' shopping_items row. No row => not_checked.
   const stapleRowByIngredient = new Map<string, ShoppingItemWithIngredient>();
   for (const item of items) {
     if (item.source === "staple") stapleRowByIngredient.set(item.ingredient_id, item);
@@ -58,29 +56,6 @@ export default async function ShoppingPage() {
       state: stapleRowByIngredient.get(i.id)?.state ?? "not_checked",
     }));
 
-  // Group active items by group_name
-  const byGroup = new Map<string, ShoppingItemWithIngredient[]>();
-  for (const item of active) {
-    const key = item.ingredients?.group_name ?? UNGROUPED;
-    const bucket = byGroup.get(key) ?? [];
-    bucket.push(item);
-    byGroup.set(key, bucket);
-  }
-  for (const bucket of byGroup.values()) {
-    bucket.sort((a, b) => {
-      const sa = a.state === "bought" ? 1 : 0;
-      const sb = b.state === "bought" ? 1 : 0;
-      if (sa !== sb) return sa - sb;
-      const an = a.ingredients?.name ?? "";
-      const bn = b.ingredients?.name ?? "";
-      return an.localeCompare(bn);
-    });
-  }
-  const groupKeys = Array.from(byGroup.keys())
-    .filter((k) => k !== UNGROUPED)
-    .sort((a, b) => a.localeCompare(b));
-  if (byGroup.has(UNGROUPED)) groupKeys.push(UNGROUPED);
-
   const toBuyCount = active.filter((i) => i.state === "to_buy").length;
   const notCheckedCount = active.filter((i) => i.state === "not_checked").length;
   const boughtCount = active.filter((i) => i.state === "bought").length;
@@ -92,7 +67,9 @@ export default async function ShoppingPage() {
         <div>
           <h1 className="font-serif text-3xl text-[var(--foreground)]">Shopping</h1>
           <p className="text-sm text-[var(--muted)] mt-1">
-            {notCheckedCount > 0 && <span>{notCheckedCount} to review · </span>}
+            {notCheckedCount > 0 && (
+              <span className="text-red-500 font-medium">{notCheckedCount} to review · </span>
+            )}
             <span className="text-[var(--accent)]">{toBuyCount} to buy</span>
             {boughtCount > 0 && (
               <span className="text-[var(--sage)]"> · {boughtCount} ticked</span>
@@ -106,34 +83,7 @@ export default async function ShoppingPage() {
       </div>
 
       <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-4">
-        {active.length === 0 ? (
-          <p className="text-sm text-[var(--muted)] italic">
-            Nothing to buy right now. Plan some meals, mark staples as needed, or add
-            something below.
-          </p>
-        ) : (
-          <div className="space-y-5">
-            {groupKeys.map((key) => {
-              const label = key === UNGROUPED ? "Other" : key;
-              const bucket = byGroup.get(key) ?? [];
-              return (
-                <section key={key} className="space-y-1">
-                  <h3 className="font-serif text-sm uppercase tracking-wide text-[var(--accent)]">
-                    {label}
-                    <span className="ml-2 text-xs font-sans text-[var(--muted)] normal-case font-normal">
-                      ({bucket.length})
-                    </span>
-                  </h3>
-                  <ul className="divide-y divide-[var(--border)]/60 bg-[var(--surface-muted)]/60 rounded-xl p-1">
-                    {bucket.map((item) => (
-                      <ShoppingItemRow key={item.id} item={item} />
-                    ))}
-                  </ul>
-                </section>
-              );
-            })}
-          </div>
-        )}
+        <ShoppingList items={active} />
       </section>
 
       <StaplesSection staples={staples} />

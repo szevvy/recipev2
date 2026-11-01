@@ -44,14 +44,37 @@ export async function setStapleStateAction(
       .eq("id", existing.id);
     if (error) return { ok: false, error: error.message };
   } else {
-    const { error } = await supabase.from("shopping_items").insert({
-      ingredient_id: ingredientId,
-      source: "staple",
-      state,
+    const { data: inserted, error } = await supabase
+      .from("shopping_items")
+      .insert({
+        ingredient_id: ingredientId,
+        source: "staple",
+        state,
+      })
+      .select("id")
+      .single();
+    if (error || !inserted) return { ok: false, error: error?.message ?? "insert failed" };
+    const { error: srcErr } = await supabase.from("shopping_item_sources").insert({
+      shopping_item_id: inserted.id,
+      kind: "staple",
     });
-    if (error) return { ok: false, error: error.message };
+    if (srcErr) return { ok: false, error: srcErr.message };
   }
 
+  revalidatePath("/shopping");
+  return { ok: true };
+}
+
+export async function setItemNotesAction(
+  id: string,
+  notes: string,
+): Promise<ActionResult> {
+  const trimmed = notes.trim();
+  const { error } = await supabaseAdmin()
+    .from("shopping_items")
+    .update({ notes: trimmed || null })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
   revalidatePath("/shopping");
   return { ok: true };
 }
@@ -86,13 +109,24 @@ export async function addManualItemAction(
 ): Promise<ActionResult> {
   if (!ingredientId) return { ok: false, error: "Pick an ingredient" };
   const trimmed = quantity.trim();
-  const { error } = await supabaseAdmin().from("shopping_items").insert({
-    ingredient_id: ingredientId,
+  const supabase = supabaseAdmin();
+  const { data: inserted, error } = await supabase
+    .from("shopping_items")
+    .insert({
+      ingredient_id: ingredientId,
+      quantity: trimmed || null,
+      source: "manual",
+      state: "to_buy",
+    })
+    .select("id")
+    .single();
+  if (error || !inserted) return { ok: false, error: error?.message ?? "insert failed" };
+  const { error: srcErr } = await supabase.from("shopping_item_sources").insert({
+    shopping_item_id: inserted.id,
+    kind: "manual",
     quantity: trimmed || null,
-    source: "manual",
-    state: "to_buy",
   });
-  if (error) return { ok: false, error: error.message };
+  if (srcErr) return { ok: false, error: srcErr.message };
   revalidatePath("/shopping");
   return { ok: true };
 }

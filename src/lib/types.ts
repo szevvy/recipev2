@@ -57,11 +57,31 @@ export type ShoppingItem = {
   source: ShoppingItemSource;
   source_ref: string | null;
   state: ShoppingItemState;
+  notes: string | null;
   created_at: string;
+};
+
+export type ShoppingItemSourceKind = "meal" | "staple" | "manual";
+
+export type ShoppingItemSourceRow = {
+  id: string;
+  shopping_item_id: string;
+  kind: ShoppingItemSourceKind;
+  meal_plan_id: string | null;
+  quantity: string | null;
+  created_at: string;
+};
+
+export type ShoppingItemSourceDetail = ShoppingItemSourceRow & {
+  meal_plan: {
+    date: string;
+    recipes: Pick<Recipe, "id" | "name"> | null;
+  } | null;
 };
 
 export type ShoppingItemWithIngredient = ShoppingItem & {
   ingredients: Pick<Ingredient, "id" | "name" | "group_name"> | null;
+  shopping_item_sources: ShoppingItemSourceDetail[];
 };
 
 export type RecipeWithIngredients = Recipe & {

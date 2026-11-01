@@ -1,17 +1,22 @@
 import "server-only";
 import { supabaseAdmin } from "./supabase";
-import { mergeShoppingItems, type MergeInput } from "./quantity";
+import {
+  formatQuantity,
+  mergeShoppingItems,
+  parseQuantity,
+  scaleQuantity,
+  type MergeInput,
+} from "./quantity";
 import type { ShoppingItemState } from "./types";
 
-// Sync rules (3-state model):
+// Sync rules (4-state model):
 //  * Rows the user has moved to 'have' or 'bought' are NEVER touched by sync.
-//  * Rows with state='to_buy' and source='meal' are refreshed from the current
-//    (unshopped) meal plan: quantity gets re-merged.
+//  * Rows with state='not_checked' or 'to_buy' and source='meal' are refreshed
+//    from the current (unshopped) meal plan: quantity gets re-merged.
 //  * Meals with shopped_at IS NOT NULL are skipped (already shopped-for).
-//  * Any is_staple=true ingredient without a row at all gets one with
-//    state='have' (default assumption: you have your staples; mark 'to_buy'
-//    when you run low).
-//  * Manual rows (source='manual') are untouched.
+//  * No orphan deletion — forgotten items stay until the user removes them.
+//  * Each meal shopping_items row gets fresh shopping_item_sources rows so the
+//    expand UI can show which recipes contributed what.
 export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = supabaseAdmin();
   const today = new Date().toISOString().slice(0, 10);
@@ -38,6 +43,11 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
     } | null;
   }>;
 
+  // Build merge inputs (for display quantity) + per-ingredient contribution list
+  // (for the sources table).
+  type Contribution = { meal_plan_id: string; quantity: string | null };
+  const contributionsByIngredient = new Map<string, Contribution[]>();
+
   const mergeInputs: MergeInput[] = [];
   for (const meal of meals) {
     if (!meal.recipes) continue;
@@ -49,11 +59,22 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
         quantity: ri.quantity,
         servings_factor: factor,
       });
+
+      const parsed = parseQuantity(ri.quantity);
+      const scaled = scaleQuantity(parsed, factor);
+      const scaledText =
+        scaled.qty != null
+          ? formatQuantity(scaled.qty, scaled.unit) || null
+          : scaled.raw || null;
+
+      const list = contributionsByIngredient.get(ri.ingredient_id) ?? [];
+      list.push({ meal_plan_id: meal.id, quantity: scaledText });
+      contributionsByIngredient.set(ri.ingredient_id, list);
     }
   }
   const mergedMeal = mergeShoppingItems(mergeInputs);
 
-  // 2. Load existing undecided/to_buy meal rows (candidates for refresh/removal).
+  // 2. Load existing undecided/to_buy meal rows (refresh candidates).
   const { data: existingMealRows, error: existingErr } = await supabase
     .from("shopping_items")
     .select("id, ingredient_id, quantity, state")
@@ -73,11 +94,7 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
     });
   }
 
-  // 3. For each merged meal ingredient:
-  //    - If an existing to_buy meal row exists -> update quantity
-  //    - If NO row exists for this ingredient at all -> insert new to_buy
-  //    - If a row exists with state=have or state=bought (any source) -> skip
-  //      (user already decided). We'll detect that with a bulk check below.
+  // 3. Skip ingredients the user has already decided (have/bought) on any row.
   const { data: anyStatefulRows } = await supabase
     .from("shopping_items")
     .select("ingredient_id, state")
@@ -86,49 +103,57 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
     (anyStatefulRows ?? []).map((r) => r.ingredient_id),
   );
 
-  const updates: Array<{ id: string; quantity: string | null }> = [];
-  const inserts: Array<{
-    ingredient_id: string;
-    quantity: string | null;
-    source: "meal";
-    state: "not_checked";
-  }> = [];
+  // 4. Resolve each merged ingredient to a shopping_items row id (upsert).
+  //    Then refresh its meal-kind sources from the contributions list.
   for (const m of mergedMeal) {
     if (statefulIngredients.has(m.ingredient_id)) continue;
+
     const existing = existingByIngredient.get(m.ingredient_id);
+    let shoppingItemId: string | null = null;
+
     if (existing) {
+      shoppingItemId = existing.id;
       if (existing.quantity !== m.quantity) {
-        updates.push({ id: existing.id, quantity: m.quantity });
+        const { error } = await supabase
+          .from("shopping_items")
+          .update({ quantity: m.quantity })
+          .eq("id", existing.id);
+        if (error) return { ok: false, error: error.message };
       }
     } else {
-      inserts.push({
-        ingredient_id: m.ingredient_id,
-        quantity: m.quantity,
-        source: "meal",
-        state: "not_checked",
-      });
+      const { data: inserted, error } = await supabase
+        .from("shopping_items")
+        .insert({
+          ingredient_id: m.ingredient_id,
+          quantity: m.quantity,
+          source: "meal",
+          state: "not_checked",
+        })
+        .select("id")
+        .single();
+      if (error || !inserted) return { ok: false, error: error?.message ?? "insert failed" };
+      shoppingItemId = inserted.id;
     }
-  }
 
-  // 4. (No orphan deletion.) Items the user hasn't engaged with (?/🛒) stay on
-  //    the list until manually removed. Deleting them silently when a meal is
-  //    unplanned (or marked shopped) meant forgotten items vanished without trace.
+    // Refresh meal-kind sources for this row.
+    const contributions = contributionsByIngredient.get(m.ingredient_id) ?? [];
+    const { error: delErr } = await supabase
+      .from("shopping_item_sources")
+      .delete()
+      .eq("shopping_item_id", shoppingItemId)
+      .eq("kind", "meal");
+    if (delErr) return { ok: false, error: delErr.message };
 
-  // 5. (No staple auto-add.) Staples now appear only in the dedicated Staples
-  //    section (which reads ingredients.is_staple=true directly). Rows are
-  //    created only when the user explicitly picks a state via that picker.
-
-  // Fire off the mutations.
-  for (const u of updates) {
-    const { error } = await supabase
-      .from("shopping_items")
-      .update({ quantity: u.quantity })
-      .eq("id", u.id);
-    if (error) return { ok: false, error: error.message };
-  }
-  if (inserts.length > 0) {
-    const { error } = await supabase.from("shopping_items").insert(inserts);
-    if (error) return { ok: false, error: error.message };
+    if (contributions.length > 0) {
+      const rows = contributions.map((c) => ({
+        shopping_item_id: shoppingItemId!,
+        kind: "meal" as const,
+        meal_plan_id: c.meal_plan_id,
+        quantity: c.quantity,
+      }));
+      const { error: insErr } = await supabase.from("shopping_item_sources").insert(rows);
+      if (insErr) return { ok: false, error: insErr.message };
+    }
   }
 
   return { ok: true };

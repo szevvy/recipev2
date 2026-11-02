@@ -112,16 +112,6 @@ export function ShoppingItemRow({
             {item.quantity ? <span className="font-medium">{item.quantity} </span> : null}
             {item.ingredients?.name ?? item.name ?? "(unknown)"}
           </span>
-          {item.source !== "meal" && (
-            <span
-              className={
-                "ml-2 text-[10px] uppercase tracking-wide " +
-                (item.source === "manual" ? "text-[var(--accent)]" : "text-[var(--muted)]")
-              }
-            >
-              {item.source === "manual" ? "added" : "staple"}
-            </span>
-          )}
           {notes && !expanded && (
             <div className="text-xs italic text-[var(--muted)] mt-0.5 truncate flex items-center gap-1">
               <PencilLine size={10} /> {notes}
@@ -196,9 +186,6 @@ function ExpandedPanel({ item }: { item: ShoppingItemWithIngredient }) {
       </label>
 
       <div>
-        <div className="text-[10px] uppercase tracking-wide text-[var(--muted)] mb-1">
-          Contributions
-        </div>
         {sources.length === 0 ? (
           <p className="text-xs italic text-[var(--muted)]">
             No source info recorded for this row.

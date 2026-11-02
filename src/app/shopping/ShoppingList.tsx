@@ -36,12 +36,10 @@ export function ShoppingList({
     byGroup.set(key, bucket);
   }
   for (const bucket of byGroup.values()) {
+    // Alphabetical within group; stays stable when items are ticked/un-ticked.
     bucket.sort((a, b) => {
-      const sa = a.state === "bought" ? 1 : 0;
-      const sb = b.state === "bought" ? 1 : 0;
-      if (sa !== sb) return sa - sb;
-      const an = a.ingredients?.name ?? "";
-      const bn = b.ingredients?.name ?? "";
+      const an = a.ingredients?.name ?? a.name ?? "";
+      const bn = b.ingredients?.name ?? b.name ?? "";
       return an.localeCompare(bn);
     });
   }

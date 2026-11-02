@@ -59,6 +59,9 @@ export function ShoppingItemRow({
   }
 
   if (removed) return null;
+  // Instant hide when the user picks 'have' — the server round-trip plus full
+  // page revalidate was taking a visible beat before the row disappeared.
+  if (state === "have") return null;
 
   const isBought = state === "bought";
   const notes = item.notes?.trim() ?? "";

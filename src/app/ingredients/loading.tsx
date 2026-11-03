@@ -6,16 +6,24 @@ function SkelLine({ className = "" }: { className?: string }) {
   );
 }
 
-function SkelGroup() {
+function SkelRow() {
+  return (
+    <li className="flex items-center gap-2 rounded-lg px-2 py-1.5">
+      <div className="h-7 w-7 rounded-full bg-[var(--border)]/60 animate-pulse shrink-0" />
+      <SkelLine className="h-4 flex-1 max-w-xs" />
+      <div className="h-7 w-7 rounded-full bg-[var(--border)]/60 animate-pulse shrink-0" />
+      <div className="h-7 w-7 rounded-full bg-[var(--border)]/60 animate-pulse shrink-0" />
+    </li>
+  );
+}
+
+function SkelGroup({ rowCount }: { rowCount: number }) {
   return (
     <section className="space-y-2">
-      <SkelLine className="h-5 w-32" />
-      <ul className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm divide-y divide-[var(--border)]/60 p-1">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <li key={i} className="flex items-center gap-2 px-2 py-1.5">
-            <div className="h-7 w-7 rounded-full bg-[var(--border)]/60 animate-pulse" />
-            <SkelLine className="h-4 flex-1" />
-          </li>
+      <SkelLine className="h-7 w-32 ml-1" />
+      <ul className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm divide-y divide-[var(--border)]/70 p-1">
+        {Array.from({ length: rowCount }).map((_, i) => (
+          <SkelRow key={i} />
         ))}
       </ul>
     </section>
@@ -26,14 +34,29 @@ export default function Loading() {
   return (
     <main className="min-h-screen p-6 max-w-4xl mx-auto space-y-6">
       <AppHeader current="/ingredients" />
-      <div>
-        <h1 className="font-serif text-3xl text-[var(--foreground)]">Ingredients</h1>
-        <SkelLine className="h-4 w-96 mt-2" />
+      <div className="space-y-2">
+        <SkelLine className="h-9 w-44" />
+        <SkelLine className="h-4 w-[32rem] max-w-full" />
       </div>
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-4 h-20 animate-pulse" />
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-4 space-y-3">
+        <SkelLine className="h-3 w-28" />
+        <div className="grid grid-cols-1 sm:grid-cols-[2fr_1.5fr_auto_auto] gap-2 items-end">
+          <div className="space-y-1.5">
+            <SkelLine className="h-3 w-10" />
+            <div className="h-9 rounded-lg bg-[var(--border)]/40 animate-pulse" />
+          </div>
+          <div className="space-y-1.5">
+            <SkelLine className="h-3 w-12" />
+            <div className="h-9 rounded-lg bg-[var(--border)]/40 animate-pulse" />
+          </div>
+          <div className="h-9 w-9 rounded-full bg-[var(--border)]/40 animate-pulse" />
+          <div className="h-9 w-16 rounded-full bg-[var(--border)]/60 animate-pulse" />
+        </div>
+      </div>
       <div className="space-y-6">
-        <SkelGroup />
-        <SkelGroup />
+        <SkelGroup rowCount={5} />
+        <SkelGroup rowCount={3} />
+        <SkelGroup rowCount={6} />
       </div>
     </main>
   );

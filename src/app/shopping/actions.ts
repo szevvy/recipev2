@@ -164,7 +164,7 @@ export async function addOneOffItemAction(
 
 // Finish shopping:
 //   1. Record every bought item in purchase_history (one row per bought item).
-//   2. Delete the bought rows (purchased, consumed).
+//   2. Delete bought AND have rows (purchased or consumed this trip).
 //   3. Reset remaining staple rows to 'not_checked' so next trip starts fresh
 //      (meal/manual rows keep their state — forgotten items persist).
 //   4. Stamp current (unshopped) meal_plan entries so sync won't re-add their items.
@@ -198,7 +198,7 @@ export async function finishShoppingAction(): Promise<ActionResult> {
   const { error: delErr } = await supabase
     .from("shopping_items")
     .delete()
-    .eq("state", "bought");
+    .in("state", ["bought", "have"]);
   if (delErr) return { ok: false, error: delErr.message };
 
   const { error: resetErr } = await supabase

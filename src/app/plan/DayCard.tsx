@@ -139,14 +139,29 @@ export function DayCard({
         </div>
 
         {mealLocal ? (
-          <button
-            onClick={() => setPicking(true)}
-            className="group flex-1 text-left -mx-2 -mb-2 px-2 pb-2 rounded-xl hover:bg-[var(--accent-soft)] transition-colors"
-          >
-            <div className="font-medium text-[var(--foreground)] group-hover:text-[var(--accent)] truncate">
-              {mealLocal.recipes?.name ?? "(deleted recipe)"}
-            </div>
-          </button>
+          mealLocal.recipes?.image_url ? (
+            <button
+              onClick={() => setPicking(true)}
+              className="group flex-1 text-left -mx-2 -mb-2 min-h-[7rem] rounded-xl overflow-hidden relative bg-cover bg-center transition-transform hover:scale-[1.01]"
+              style={{ backgroundImage: `url(${mealLocal.recipes.image_url})` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+              <div className="relative flex flex-col justify-end h-full p-2">
+                <div className="font-medium text-white drop-shadow-sm truncate">
+                  {mealLocal.recipes?.name ?? "(deleted recipe)"}
+                </div>
+              </div>
+            </button>
+          ) : (
+            <button
+              onClick={() => setPicking(true)}
+              className="group flex-1 text-left -mx-2 -mb-2 px-2 pb-2 rounded-xl hover:bg-[var(--accent-soft)] transition-colors"
+            >
+              <div className="font-medium text-[var(--foreground)] group-hover:text-[var(--accent)] truncate">
+                {mealLocal.recipes?.name ?? "(deleted recipe)"}
+              </div>
+            </button>
+          )
         ) : (
           <button
             onClick={() => setPicking(true)}

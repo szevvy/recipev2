@@ -34,11 +34,17 @@ export default function Loading() {
     <main className="min-h-screen p-6 max-w-5xl mx-auto space-y-6">
       <AppHeader current="/shopping" />
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-2">
-          <SkelLine className="h-9 w-40" />
-          <SkelLine className="h-4 w-56" />
+        <div>
+          <h1 className="font-serif text-3xl text-[var(--foreground)]">Shopping</h1>
+          <SkelLine className="h-4 w-56 mt-2" />
         </div>
-        <div className="h-9 w-40 rounded-full bg-[var(--border)]/60 animate-pulse" />
+        <button
+          type="button"
+          disabled
+          className="inline-flex items-center gap-1.5 rounded-full bg-[var(--sage)] text-white text-sm px-4 py-2 opacity-60"
+        >
+          Finish shopping
+        </button>
       </div>
 
       <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-5">
@@ -50,20 +56,29 @@ export default function Loading() {
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-4 h-[3.75rem] animate-pulse" />
 
       <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-3">
-        <div className="space-y-2">
-          <SkelLine className="h-7 w-40" />
-          <SkelLine className="h-3.5 w-[26rem] max-w-full" />
+        <div>
+          <h2 className="font-serif text-xl text-[var(--foreground)]">Add something</h2>
+          <p className="text-xs text-[var(--muted)] mt-0.5">
+            Pick an ingredient to merge quantities, or type anything else (a light
+            bulb, batteries) to add as a one-off.
+          </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_auto] gap-2 items-end">
-          <div className="space-y-1.5">
-            <SkelLine className="h-3 w-10" />
-            <div className="h-9 rounded-lg bg-[var(--border)]/40 animate-pulse" />
+          <div className="space-y-0.5">
+            <span className="text-xs text-[var(--muted)]">Item</span>
+            <div className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]" />
           </div>
-          <div className="space-y-1.5">
-            <SkelLine className="h-3 w-16" />
-            <div className="h-9 rounded-lg bg-[var(--border)]/40 animate-pulse" />
+          <div className="space-y-0.5">
+            <span className="text-xs text-[var(--muted)]">Quantity</span>
+            <div className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]" />
           </div>
-          <div className="h-9 w-16 rounded-full bg-[var(--border)]/60 animate-pulse" />
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)] text-white text-sm px-3 py-1.5 opacity-60"
+          >
+            Add
+          </button>
         </div>
       </section>
     </main>

@@ -34,23 +34,33 @@ export default function Loading() {
   return (
     <main className="min-h-screen p-6 max-w-4xl mx-auto space-y-6">
       <AppHeader current="/ingredients" />
-      <div className="space-y-2">
-        <SkelLine className="h-9 w-44" />
-        <SkelLine className="h-4 w-[32rem] max-w-full" />
+      <div>
+        <h1 className="font-serif text-3xl text-[var(--foreground)]">Ingredients</h1>
+        <p className="text-sm text-[var(--muted)] mt-1">
+          The star marks staples. Groups come from whatever you type in the Group field.
+        </p>
       </div>
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-4 space-y-3">
-        <SkelLine className="h-3 w-28" />
+        <h2 className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">
+          Add ingredient
+        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-[2fr_1.5fr_auto_auto] gap-2 items-end">
-          <div className="space-y-1.5">
-            <SkelLine className="h-3 w-10" />
-            <div className="h-9 rounded-lg bg-[var(--border)]/40 animate-pulse" />
+          <div className="space-y-0.5">
+            <span className="text-xs text-[var(--muted)]">Name</span>
+            <div className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]" />
           </div>
-          <div className="space-y-1.5">
-            <SkelLine className="h-3 w-12" />
-            <div className="h-9 rounded-lg bg-[var(--border)]/40 animate-pulse" />
+          <div className="space-y-0.5">
+            <span className="text-xs text-[var(--muted)]">Group</span>
+            <div className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]" />
           </div>
           <div className="h-9 w-9 rounded-full bg-[var(--border)]/40 animate-pulse" />
-          <div className="h-9 w-16 rounded-full bg-[var(--border)]/60 animate-pulse" />
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)] text-white text-sm px-3 py-1.5 opacity-60"
+          >
+            Add
+          </button>
         </div>
       </div>
       <div className="space-y-6">

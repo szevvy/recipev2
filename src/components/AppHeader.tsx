@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { HeaderMenu } from "./HeaderMenu";
+import { NavLink } from "./NavLink";
 
 const navItems: { href: string; label: string; disabled?: boolean }[] = [
   { href: "/", label: "Home" },
@@ -13,9 +13,9 @@ export function AppHeader({ current }: { current: string }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-4 pb-5 mb-6 border-b border-[var(--border)]">
       <div className="flex items-baseline gap-6">
-        <Link href="/" className="font-serif text-2xl text-[var(--accent)] font-semibold">
+        <NavLink href="/" className="font-serif text-2xl text-[var(--accent)] font-semibold">
           Kitchen
-        </Link>
+        </NavLink>
         <nav className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
           {navItems.slice(1).map((item) => {
             const isCurrent = item.href === current;
@@ -31,7 +31,7 @@ export function AppHeader({ current }: { current: string }) {
               );
             }
             return (
-              <Link
+              <NavLink
                 key={item.href}
                 href={item.href}
                 className={
@@ -41,7 +41,7 @@ export function AppHeader({ current }: { current: string }) {
                 }
               >
                 {item.label}
-              </Link>
+              </NavLink>
             );
           })}
         </nav>

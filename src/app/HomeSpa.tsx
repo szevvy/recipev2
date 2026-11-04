@@ -93,27 +93,25 @@ function ShellHeader({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4 pb-5 mb-6 border-b border-[var(--border)]">
-      <div className="flex items-baseline gap-6">
-        <button
-          type="button"
-          onClick={() => onChangeTab("shopping")}
-          className="font-serif text-2xl text-[var(--accent)] font-semibold"
-        >
-          Kitchen
-        </button>
-        <nav className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm">
-          {TABS.map((t) => (
-            <TabButton
-              key={t.id}
-              label={t.label}
-              active={t.id === tab}
-              onClick={() => onChangeTab(t.id)}
-            />
-          ))}
-        </nav>
-      </div>
-      <div className="relative">
+    <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pb-5 mb-6 border-b border-[var(--border)]">
+      <button
+        type="button"
+        onClick={() => onChangeTab("shopping")}
+        className="font-serif text-2xl text-[var(--accent)] font-semibold w-full sm:w-auto text-left"
+      >
+        Kitchen
+      </button>
+      <nav className="flex flex-wrap items-baseline gap-x-4 sm:gap-x-5 gap-y-1 text-sm">
+        {TABS.map((t) => (
+          <TabButton
+            key={t.id}
+            label={t.label}
+            active={t.id === tab}
+            onClick={() => onChangeTab(t.id)}
+          />
+        ))}
+      </nav>
+      <div className="relative ml-auto">
         <button
           type="button"
           onClick={() => setMenuOpen((o) => !o)}

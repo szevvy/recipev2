@@ -11,13 +11,15 @@ const navItems: { href: string; label: string; disabled?: boolean }[] = [
 
 export function AppHeader({ current }: { current: string }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4 pb-5 mb-6 border-b border-[var(--border)]">
-      <div className="flex items-baseline gap-6">
-        <Link href="/" className="font-serif text-2xl text-[var(--accent)] font-semibold">
-          Kitchen
-        </Link>
-        <nav className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm">
-          {navItems.slice(1).map((item) => {
+    <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pb-5 mb-6 border-b border-[var(--border)]">
+      <Link
+        href="/"
+        className="font-serif text-2xl text-[var(--accent)] font-semibold w-full sm:w-auto"
+      >
+        Kitchen
+      </Link>
+      <nav className="flex flex-wrap items-baseline gap-x-4 sm:gap-x-5 gap-y-1 text-sm">
+        {navItems.slice(1).map((item) => {
             const isCurrent = item.href === current;
             if (item.disabled) {
               return (
@@ -60,9 +62,10 @@ export function AppHeader({ current }: { current: string }) {
               </Link>
             );
           })}
-        </nav>
+      </nav>
+      <div className="ml-auto">
+        <HeaderMenu />
       </div>
-      <HeaderMenu />
     </header>
   );
 }

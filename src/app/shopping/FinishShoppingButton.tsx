@@ -2,18 +2,45 @@
 
 import { useTransition } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { useInvalidateBootstrap } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  BOOTSTRAP_KEY,
+  useInvalidateBootstrap,
+  type BootstrapData,
+} from "@/lib/queries";
 import { finishShoppingAction } from "./actions";
 
 export function FinishShoppingButton() {
   const [pending, startTransition] = useTransition();
   const invalidate = useInvalidateBootstrap();
+  const qc = useQueryClient();
 
   function onClick() {
     if (!confirm("Finish shopping? This clears bought items and resets staples.")) return;
+
+    const snapshot = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
+    const nowIso = new Date().toISOString();
+
+    // Mirror the server's finish steps on the cache so the list clears
+    // immediately: drop bought+have rows, reset remaining staples to
+    // not_checked, stamp current meals as shopped so sync won't re-add them.
+    qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+      if (!old) return old;
+      const shoppingItems = old.shoppingItems
+        .filter((i) => i.state !== "bought" && i.state !== "have")
+        .map((i) => (i.source === "staple" ? { ...i, state: "not_checked" as const } : i));
+      const meals = old.meals.map((m) =>
+        m.shopped_at ? m : { ...m, shopped_at: nowIso },
+      );
+      return { ...old, shoppingItems, meals };
+    });
+
     startTransition(async () => {
       const result = await finishShoppingAction();
-      if (result.ok) invalidate();
+      if (!result.ok) {
+        if (snapshot) qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, snapshot);
+        else invalidate();
+      }
     });
   }
 

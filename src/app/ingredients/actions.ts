@@ -18,7 +18,10 @@ function toError(err: unknown): string {
 export async function createIngredientAction(fd: FormData): Promise<ActionResult> {
   try {
     const input = parseIngredientForm(fd);
+    const rawId = fd.get("id");
+    const rowId = typeof rawId === "string" && rawId.length > 0 ? rawId : undefined;
     const { error } = await supabaseAdmin().from("ingredients").insert({
+      id: rowId,
       name: input.name,
       group_name: input.group_name,
       is_staple: input.is_staple,

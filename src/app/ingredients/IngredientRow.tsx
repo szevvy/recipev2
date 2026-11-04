@@ -2,10 +2,15 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Pencil, Trash2, Check, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Ingredient } from "@/lib/types";
 import { StarButton, StarToggleHidden } from "@/components/StarButton";
 import { GroupCombobox } from "@/components/GroupCombobox";
-import { useInvalidateBootstrap } from "@/lib/queries";
+import {
+  BOOTSTRAP_KEY,
+  useInvalidateBootstrap,
+  type BootstrapData,
+} from "@/lib/queries";
 import {
   deleteIngredientAction,
   toggleStapleAction,
@@ -26,6 +31,7 @@ export function IngredientRow({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const invalidate = useInvalidateBootstrap();
+  const qc = useQueryClient();
 
   useEffect(() => {
     setIsStapleLocal(ingredient.is_staple);
@@ -43,30 +49,68 @@ export function IngredientRow({
   }
 
   function onSave(fd: FormData) {
+    const nextName = String(fd.get("name") ?? "").trim();
+    const nextGroup = String(fd.get("group_name") ?? "").trim();
+    const nextStaple = fd.get("is_staple") != null;
+    if (!nextName) {
+      setError("Name is required");
+      return;
+    }
+    const snapshot = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
+    qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+      if (!old) return old;
+      const next = old.ingredients
+        .map((i) =>
+          i.id === ingredient.id
+            ? {
+                ...i,
+                name: nextName,
+                group_name: nextGroup || null,
+                is_staple: nextStaple,
+                updated_at: new Date().toISOString(),
+              }
+            : i,
+        )
+        .sort((a, b) => a.name.localeCompare(b.name));
+      return { ...old, ingredients: next };
+    });
+    setIsStapleLocal(nextStaple);
+    setEditing(false);
     setError(null);
+
     startTransition(async () => {
       const result = await updateIngredientAction(ingredient.id, fd);
       if (!result.ok) {
+        if (snapshot) qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, snapshot);
+        else invalidate();
+        setIsStapleLocal(ingredient.is_staple);
+        setEditing(true);
         setError(result.error);
-        return;
       }
-      setEditing(false);
-      invalidate();
     });
   }
 
   function onDelete() {
     if (!confirm(`Delete "${ingredient.name}"?`)) return;
-    setError(null);
+    const snapshot = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
     setDeletedLocal(true);
+    setError(null);
+    qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        ingredients: old.ingredients.filter((i) => i.id !== ingredient.id),
+      };
+    });
+
     startTransition(async () => {
       const result = await deleteIngredientAction(ingredient.id);
       if (!result.ok) {
+        if (snapshot) qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, snapshot);
+        else invalidate();
         setDeletedLocal(false);
         setError(result.error);
-        return;
       }
-      invalidate();
     });
   }
 
@@ -74,14 +118,30 @@ export function IngredientRow({
     const next = !isStapleLocal;
     setIsStapleLocal(next);
     setError(null);
+    qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        ingredients: old.ingredients.map((i) =>
+          i.id === ingredient.id ? { ...i, is_staple: next } : i,
+        ),
+      };
+    });
     startTransition(async () => {
       const result = await toggleStapleAction(ingredient.id, next);
       if (!result.ok) {
         setIsStapleLocal(!next);
+        qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            ingredients: old.ingredients.map((i) =>
+              i.id === ingredient.id ? { ...i, is_staple: !next } : i,
+            ),
+          };
+        });
         setError(result.error);
-        return;
       }
-      invalidate();
     });
   }
 

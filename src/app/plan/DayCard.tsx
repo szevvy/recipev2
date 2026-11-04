@@ -4,8 +4,13 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { Plus, X } from "lucide-react";
 import { format, isToday, isPast } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 import type { MealPlanWithRecipe, Recipe } from "@/lib/types";
-import { useInvalidateBootstrap } from "@/lib/queries";
+import {
+  BOOTSTRAP_KEY,
+  useInvalidateBootstrap,
+  type BootstrapData,
+} from "@/lib/queries";
 import { clearMealAction, setMealAction } from "./actions";
 import { RecipeModal } from "./RecipeModal";
 
@@ -28,6 +33,7 @@ export function DayCard({
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const invalidate = useInvalidateBootstrap();
+  const qc = useQueryClient();
   const dateIso = format(date, "yyyy-MM-dd");
   const today = isToday(date);
   const past = !today && isPast(date);
@@ -35,6 +41,25 @@ export function DayCard({
   useEffect(() => {
     setMealLocal(meal);
   }, [meal]);
+
+  // Patch every plan week cache + bootstrap.meals so the day card re-renders
+  // from cached data instantly, without a bootstrap refetch (that round-trip
+  // was causing a visible beat + scroll nudge on mobile).
+  function patchMealCaches(nextMeal: MealPlanWithRecipe | null) {
+    qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+      if (!old) return old;
+      const filtered = old.meals.filter((m) => m.date !== dateIso);
+      return {
+        ...old,
+        meals: nextMeal ? [...filtered, nextMeal] : filtered,
+      };
+    });
+    qc.setQueriesData<MealPlanWithRecipe[]>({ queryKey: ["plan"] }, (old) => {
+      if (!old) return old;
+      const filtered = old.filter((m) => m.date !== dateIso);
+      return nextMeal ? [...filtered, nextMeal] : filtered;
+    });
+  }
 
   function assign(recipeId: string) {
     const recipe = recipes.find((r) => r.id === recipeId);
@@ -72,16 +97,20 @@ export function DayCard({
       },
     };
     setMealLocal(optimistic);
+    patchMealCaches(optimistic);
     setPicking(false);
     setError(null);
     startTransition(async () => {
       const result = await setMealAction(dateIso, recipeId, undefined, removeOldIngredients);
       if (!result.ok) {
         setMealLocal(previous);
+        patchMealCaches(previous);
         setError(result.error);
         return;
       }
-      invalidate();
+      // Shopping list items change server-side (sync + orphan cleanup), so
+      // refresh bootstrap when we touched the shopping side too.
+      if (removeOldIngredients) invalidate();
     });
   }
 
@@ -97,15 +126,17 @@ export function DayCard({
         : false;
 
     setMealLocal(null);
+    patchMealCaches(null);
     setError(null);
     startTransition(async () => {
       const result = await clearMealAction(dateIso, removeIngredients);
       if (!result.ok) {
         setMealLocal(previous);
+        patchMealCaches(previous);
         setError(result.error);
         return;
       }
-      invalidate();
+      if (removeIngredients) invalidate();
     });
   }
 

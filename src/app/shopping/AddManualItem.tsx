@@ -2,9 +2,14 @@
 
 import { useRef, useState, useTransition } from "react";
 import { Plus } from "lucide-react";
-import type { Ingredient } from "@/lib/types";
+import { useQueryClient } from "@tanstack/react-query";
+import type { Ingredient, ShoppingItemWithIngredient } from "@/lib/types";
 import { IngredientPicker } from "@/components/IngredientPicker";
-import { useInvalidateBootstrap } from "@/lib/queries";
+import {
+  BOOTSTRAP_KEY,
+  useInvalidateBootstrap,
+  type BootstrapData,
+} from "@/lib/queries";
 import { addManualItemAction, addOneOffItemAction } from "./actions";
 
 export function AddManualItem({ ingredients }: { ingredients: Ingredient[] }) {
@@ -16,6 +21,7 @@ export function AddManualItem({ ingredients }: { ingredients: Ingredient[] }) {
   const [pending, startTransition] = useTransition();
   const qtyRef = useRef<HTMLInputElement>(null);
   const invalidate = useInvalidateBootstrap();
+  const qc = useQueryClient();
 
   function submit() {
     const typed = query.trim();
@@ -29,20 +35,61 @@ export function AddManualItem({ ingredients }: { ingredients: Ingredient[] }) {
     const typedLower = typed.toLowerCase();
     const matched = library.find((i) => i.name.toLowerCase() === typedLower);
 
+    const rowId = typeof crypto !== "undefined" ? crypto.randomUUID() : "";
+    const trimmedQty = currentQty.trim();
+
+    const newRow: ShoppingItemWithIngredient = {
+      id: rowId,
+      ingredient_id: matched?.id ?? null,
+      name: matched ? null : typed,
+      quantity: trimmedQty || null,
+      source: "manual",
+      source_ref: null,
+      state: "to_buy",
+      notes: null,
+      unit_key: null,
+      created_at: new Date().toISOString(),
+      ingredients: matched
+        ? { id: matched.id, name: matched.name, group_name: matched.group_name }
+        : null,
+      shopping_item_sources: [
+        {
+          id: typeof crypto !== "undefined" ? crypto.randomUUID() : "",
+          shopping_item_id: rowId,
+          kind: "manual",
+          meal_plan_id: null,
+          quantity: trimmedQty || null,
+          created_at: new Date().toISOString(),
+          meal_plan: null,
+        },
+      ],
+    };
+
+    qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+      if (!old) return old;
+      return { ...old, shoppingItems: [...old.shoppingItems, newRow] };
+    });
+    setIngredientId(null);
+    setQuery("");
+    setQuantity("");
     setError(null);
+
     startTransition(async () => {
       const result = matched
-        ? await addManualItemAction(matched.id, currentQty)
-        : await addOneOffItemAction(typed, currentQty);
+        ? await addManualItemAction(matched.id, currentQty, rowId)
+        : await addOneOffItemAction(typed, currentQty, rowId);
 
       if (!result.ok) {
+        qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            shoppingItems: old.shoppingItems.filter((i) => i.id !== rowId),
+          };
+        });
         setError(result.error);
-        return;
+        invalidate();
       }
-      setIngredientId(null);
-      setQuery("");
-      setQuantity("");
-      invalidate();
     });
   }
 

@@ -1,37 +1,83 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Plus } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { StarToggleHidden } from "@/components/StarButton";
 import { GroupCombobox } from "@/components/GroupCombobox";
-import { useInvalidateBootstrap } from "@/lib/queries";
-import { createIngredientAction, type ActionResult } from "./actions";
-
-async function wrappedAction(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
-  return createIngredientAction(fd);
-}
+import {
+  BOOTSTRAP_KEY,
+  useInvalidateBootstrap,
+  type BootstrapData,
+} from "@/lib/queries";
+import type { Ingredient } from "@/lib/types";
+import { createIngredientAction } from "./actions";
 
 export function AddIngredientForm({ groupSuggestions }: { groupSuggestions: string[] }) {
-  const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
-    wrappedAction,
-    null,
-  );
   const [isStaple, setIsStaple] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
   const invalidate = useInvalidateBootstrap();
+  const qc = useQueryClient();
 
-  useEffect(() => {
-    if (state?.ok) {
-      formRef.current?.reset();
-      setIsStaple(false);
-      invalidate();
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const name = String(fd.get("name") ?? "").trim();
+    if (!name) {
+      setError("Name is required");
+      return;
     }
-  }, [state, invalidate]);
+    const groupName = String(fd.get("group_name") ?? "").trim();
+    const rowId = typeof crypto !== "undefined" ? crypto.randomUUID() : "";
+    fd.set("id", rowId);
+
+    const nowIso = new Date().toISOString();
+    const newIng: Ingredient = {
+      id: rowId,
+      name,
+      group_name: groupName || null,
+      is_staple: isStaple,
+      staple_state: "not_checked",
+      created_at: nowIso,
+      updated_at: nowIso,
+    };
+
+    qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+      if (!old) return old;
+      // Keep alphabetical so the new row lands where the list renders it.
+      const next = [...old.ingredients, newIng].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
+      return { ...old, ingredients: next };
+    });
+
+    form.reset();
+    setIsStaple(false);
+    setError(null);
+
+    startTransition(async () => {
+      const result = await createIngredientAction(fd);
+      if (!result.ok) {
+        qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            ingredients: old.ingredients.filter((i) => i.id !== rowId),
+          };
+        });
+        setError(result.error);
+        invalidate();
+      }
+    });
+  }
 
   return (
     <form
       ref={formRef}
-      action={formAction}
+      onSubmit={onSubmit}
       className="rounded-2xl border border-[var(--border)] p-4 bg-[var(--surface)] shadow-sm space-y-3"
     >
       <h2 className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">
@@ -65,14 +111,13 @@ export function AddIngredientForm({ groupSuggestions }: { groupSuggestions: stri
         />
         <button
           type="submit"
-          disabled={pending}
-          className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)] text-white text-sm px-3 py-1.5 disabled:opacity-60 hover:bg-[var(--accent-hover)] transition-colors"
+          className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)] text-white text-sm px-3 py-1.5 hover:bg-[var(--accent-hover)] transition-colors"
         >
           <Plus size={16} />
-          {pending ? "Adding…" : "Add"}
+          Add
         </button>
       </div>
-      {state && !state.ok && <p className="text-sm text-red-600">{state.error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
     </form>
   );
 }

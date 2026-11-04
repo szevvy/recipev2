@@ -15,10 +15,13 @@ export async function syncShoppingListAction(): Promise<ActionResult> {
 }
 
 // Set state for a staple ingredient via its *ingredient_id* (not a shopping_items id).
-// Creates the row on first pick, deletes it when the user picks ? back.
+// Creates the row on first pick, deletes it when the user picks ? back. The
+// client can pass a pre-generated UUID so the row the client pins in cache
+// matches the row created on the server — no post-insert swap needed.
 export async function setStapleStateAction(
   ingredientId: string,
   state: ShoppingItemState,
+  rowId?: string,
 ): Promise<ActionResult> {
   if (!["not_checked", "to_buy", "have", "bought"].includes(state)) {
     return { ok: false, error: "Invalid state" };
@@ -47,6 +50,7 @@ export async function setStapleStateAction(
     const { data: inserted, error } = await supabase
       .from("shopping_items")
       .insert({
+        id: rowId,
         ingredient_id: ingredientId,
         source: "staple",
         state,
@@ -106,6 +110,7 @@ export async function removeShoppingItemAction(id: string): Promise<ActionResult
 export async function addManualItemAction(
   ingredientId: string,
   quantity: string,
+  rowId?: string,
 ): Promise<ActionResult> {
   if (!ingredientId) return { ok: false, error: "Pick an ingredient" };
   const trimmed = quantity.trim();
@@ -113,6 +118,7 @@ export async function addManualItemAction(
   const { data: inserted, error } = await supabase
     .from("shopping_items")
     .insert({
+      id: rowId,
       ingredient_id: ingredientId,
       quantity: trimmed || null,
       source: "manual",
@@ -136,6 +142,7 @@ export async function addManualItemAction(
 export async function addOneOffItemAction(
   name: string,
   quantity: string,
+  rowId?: string,
 ): Promise<ActionResult> {
   const trimmedName = name.trim();
   if (!trimmedName) return { ok: false, error: "Give it a name" };
@@ -144,6 +151,7 @@ export async function addOneOffItemAction(
   const { data: inserted, error } = await supabase
     .from("shopping_items")
     .insert({
+      id: rowId,
       name: trimmedName,
       quantity: trimmedQty || null,
       source: "manual",

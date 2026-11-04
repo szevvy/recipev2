@@ -2,9 +2,18 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { ChevronDown, Sparkles } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { paletteColor } from "@/lib/category-palette";
-import { useInvalidateBootstrap } from "@/lib/queries";
-import type { CategoryMetaRow, ShoppingItemState } from "@/lib/types";
+import {
+  BOOTSTRAP_KEY,
+  useInvalidateBootstrap,
+  type BootstrapData,
+} from "@/lib/queries";
+import type {
+  CategoryMetaRow,
+  ShoppingItemState,
+  ShoppingItemWithIngredient,
+} from "@/lib/types";
 import { setStapleStateAction } from "./actions";
 import { StatePicker } from "./StatePicker";
 
@@ -145,24 +154,78 @@ function StapleRow({
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const invalidate = useInvalidateBootstrap();
+  const qc = useQueryClient();
 
   useEffect(() => {
     setState(item.state);
   }, [item.state]);
 
+  function patchCache(next: ShoppingItemState, rowId: string) {
+    // Mirror the server's insert/update/delete on the bootstrap cache so the
+    // staples summary + ShoppingList re-derive instantly without a refetch.
+    qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+      if (!old) return old;
+      const existing = old.shoppingItems.find(
+        (i) => i.source === "staple" && i.ingredient_id === item.ingredient_id,
+      );
+      if (next === "not_checked") {
+        if (!existing) return old;
+        return {
+          ...old,
+          shoppingItems: old.shoppingItems.filter((i) => i.id !== existing.id),
+        };
+      }
+      if (existing) {
+        return {
+          ...old,
+          shoppingItems: old.shoppingItems.map((i) =>
+            i.id === existing.id ? { ...i, state: next } : i,
+          ),
+        };
+      }
+      const ingredient = old.ingredients.find((i) => i.id === item.ingredient_id);
+      const newRow: ShoppingItemWithIngredient = {
+        id: rowId,
+        ingredient_id: item.ingredient_id,
+        name: null,
+        quantity: null,
+        source: "staple",
+        source_ref: null,
+        state: next,
+        notes: null,
+        unit_key: null,
+        created_at: new Date().toISOString(),
+        ingredients: ingredient
+          ? {
+              id: ingredient.id,
+              name: ingredient.name,
+              group_name: ingredient.group_name,
+            }
+          : null,
+        shopping_item_sources: [],
+      };
+      return {
+        ...old,
+        shoppingItems: [...old.shoppingItems, newRow],
+      };
+    });
+  }
+
   function update(next: ShoppingItemState) {
     if (next === state) return;
     const previous = state;
+    const rowId = typeof crypto !== "undefined" ? crypto.randomUUID() : "";
     setState(next);
+    patchCache(next, rowId);
     setError(null);
     startTransition(async () => {
-      const result = await setStapleStateAction(item.ingredient_id, next);
+      const result = await setStapleStateAction(item.ingredient_id, next, rowId);
       if (!result.ok) {
         setState(previous);
         setError(result.error);
-        return;
+        // Cache may be out of sync — fall back to a refetch.
+        invalidate();
       }
-      invalidate();
     });
   }
 

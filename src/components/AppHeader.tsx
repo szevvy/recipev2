@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { HeaderMenu } from "./HeaderMenu";
 
-const navItems: { href: string; label: string; current?: string; disabled?: boolean }[] = [
+const navItems: { href: string; label: string; disabled?: boolean }[] = [
   { href: "/", label: "Home" },
   { href: "/shopping", label: "Shopping" },
   { href: "/plan", label: "Plan" },
@@ -16,17 +16,22 @@ export function AppHeader({ current }: { current: string }) {
         <Link href="/" className="font-serif text-2xl text-[var(--accent)] font-semibold">
           Kitchen
         </Link>
-        <nav className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+        <nav className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm">
           {navItems.slice(1).map((item) => {
             const isCurrent = item.href === current;
             if (item.disabled) {
               return (
                 <span
                   key={item.href}
-                  className="text-stone-400 cursor-not-allowed"
+                  className="grid text-stone-400 cursor-not-allowed"
                   title="Coming soon"
                 >
-                  {item.label}
+                  <span aria-hidden className="row-start-1 col-start-1 font-semibold invisible">
+                    {item.label}
+                  </span>
+                  <span className="row-start-1 col-start-1 text-center">
+                    {item.label}
+                  </span>
                 </span>
               );
             }
@@ -34,13 +39,24 @@ export function AppHeader({ current }: { current: string }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={
-                  isCurrent
-                    ? "font-semibold text-[var(--accent)]"
-                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                }
+                className="grid"
               >
-                {item.label}
+                <span
+                  aria-hidden
+                  className="row-start-1 col-start-1 font-semibold invisible"
+                >
+                  {item.label}
+                </span>
+                <span
+                  className={
+                    "row-start-1 col-start-1 text-center transition-colors " +
+                    (isCurrent
+                      ? "font-semibold text-[var(--accent)]"
+                      : "text-[var(--muted)] hover:text-[var(--foreground)]")
+                  }
+                >
+                  {item.label}
+                </span>
               </Link>
             );
           })}

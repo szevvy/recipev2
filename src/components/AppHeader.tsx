@@ -3,10 +3,10 @@ import { HeaderMenu } from "./HeaderMenu";
 
 const navItems: { href: string; label: string; current?: string; disabled?: boolean }[] = [
   { href: "/", label: "Home" },
-  { href: "/?tab=shopping", label: "Shopping", current: "/shopping" },
-  { href: "/?tab=plan", label: "Plan", current: "/plan" },
-  { href: "/?tab=recipes", label: "Recipes", current: "/recipes" },
-  { href: "/?tab=ingredients", label: "Ingredients", current: "/ingredients" },
+  { href: "/shopping", label: "Shopping" },
+  { href: "/plan", label: "Plan" },
+  { href: "/recipes", label: "Recipes" },
+  { href: "/ingredients", label: "Ingredients" },
 ];
 
 export function AppHeader({ current }: { current: string }) {
@@ -18,7 +18,7 @@ export function AppHeader({ current }: { current: string }) {
         </Link>
         <nav className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
           {navItems.slice(1).map((item) => {
-            const isCurrent = item.current === current || item.href === current;
+            const isCurrent = item.href === current;
             if (item.disabled) {
               return (
                 <span

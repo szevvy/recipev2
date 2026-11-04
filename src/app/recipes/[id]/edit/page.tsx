@@ -37,7 +37,7 @@ export default async function EditRecipePage({
 
   if (recipeErr) {
     return (
-      <main className="min-h-screen p-6 max-w-5xl mx-auto">
+      <main className="min-h-screen p-6 max-w-6xl mx-auto">
         <AppHeader current="/recipes" />
         <p className="text-red-600">Failed to load recipe: {recipeErr.message}</p>
       </main>
@@ -46,7 +46,7 @@ export default async function EditRecipePage({
   if (!recipe) notFound();
 
   return (
-    <main className="min-h-screen p-6 max-w-5xl mx-auto space-y-6">
+    <main className="min-h-screen p-6 max-w-6xl mx-auto space-y-6">
       <AppHeader current="/recipes" />
       <div className="flex items-center justify-between gap-4">
         <Link

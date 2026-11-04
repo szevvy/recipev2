@@ -1,7 +1,5 @@
-import { redirect } from "next/navigation";
+import { HomeSpa } from "../HomeSpa";
 
-// The shopping list now lives as a tab inside the SPA at `/`. Old bookmarks
-// land here and get bounced to the right tab.
-export default function ShoppingRedirect() {
-  redirect("/?tab=shopping");
+export default function ShoppingPage() {
+  return <HomeSpa initialTab="shopping" />;
 }

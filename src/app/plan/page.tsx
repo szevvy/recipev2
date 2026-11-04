@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { HomeSpa } from "../HomeSpa";
 
-export default function PlanRedirect() {
-  redirect("/?tab=plan");
+export default function PlanPage() {
+  return <HomeSpa initialTab="plan" />;
 }

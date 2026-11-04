@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { HomeSpa } from "../HomeSpa";
 
-export default function RecipesRedirect() {
-  redirect("/?tab=recipes");
+export default function RecipesPage() {
+  return <HomeSpa initialTab="recipes" />;
 }

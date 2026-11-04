@@ -10,34 +10,46 @@ import { PlanTab } from "./_tabs/PlanTab";
 import { RecipesTab } from "./_tabs/RecipesTab";
 import { IngredientsTab } from "./_tabs/IngredientsTab";
 
-type TabId = "shopping" | "plan" | "recipes" | "ingredients";
+export type TabId = "shopping" | "plan" | "recipes" | "ingredients";
 
-const TABS: Array<{ id: TabId; label: string }> = [
-  { id: "shopping", label: "Shopping" },
-  { id: "plan", label: "Plan" },
-  { id: "recipes", label: "Recipes" },
-  { id: "ingredients", label: "Ingredients" },
+const TABS: Array<{ id: TabId; label: string; path: string }> = [
+  { id: "shopping", label: "Shopping", path: "/shopping" },
+  { id: "plan", label: "Plan", path: "/plan" },
+  { id: "recipes", label: "Recipes", path: "/recipes" },
+  { id: "ingredients", label: "Ingredients", path: "/ingredients" },
 ];
 
-function readInitialTab(): TabId {
-  if (typeof window === "undefined") return "shopping";
-  const param = new URLSearchParams(window.location.search).get("tab");
-  if (TABS.some((t) => t.id === param)) return param as TabId;
+function tabFromPathname(pathname: string): TabId {
+  for (const t of TABS) if (pathname.startsWith(t.path)) return t.id;
   return "shopping";
 }
 
-export function HomeSpa() {
-  const [tab, setTab] = useState<TabId>(() => readInitialTab());
+export function HomeSpa({ initialTab }: { initialTab: TabId }) {
+  const [tab, setTab] = useState<TabId>(initialTab);
   const bootstrap = useBootstrap();
+
+  // Keep the URL + local state in sync as the user switches tabs and uses
+  // browser back/forward. Each tab is its own history entry (pushState) so
+  // navigation feels like real routes.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const current = tabFromPathname(window.location.pathname);
+    if (current !== tab) {
+      const target = TABS.find((t) => t.id === tab);
+      if (target) {
+        window.history.pushState({ tab }, "", target.path);
+      }
+    }
+  }, [tab]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const current = new URLSearchParams(window.location.search).get("tab");
-    if (current !== tab) {
-      const url = `${window.location.pathname}?tab=${tab}`;
-      window.history.replaceState({}, "", url);
+    function onPop() {
+      setTab(tabFromPathname(window.location.pathname));
     }
-  }, [tab]);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   return (
     <main className="min-h-screen p-6 max-w-6xl mx-auto space-y-6">

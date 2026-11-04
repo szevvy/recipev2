@@ -37,7 +37,7 @@ export default async function RecipeViewPage({ params }: { params: Params }) {
 
   if (error) {
     return (
-      <main className="min-h-screen p-6 max-w-5xl mx-auto">
+      <main className="min-h-screen p-6 max-w-6xl mx-auto">
         <AppHeader current="/recipes" />
         <p className="text-red-600">Failed to load recipe: {error.message}</p>
       </main>
@@ -55,7 +55,7 @@ export default async function RecipeViewPage({ params }: { params: Params }) {
       : null;
 
   return (
-    <main className="min-h-screen p-6 max-w-5xl mx-auto space-y-4">
+    <main className="min-h-screen p-6 max-w-6xl mx-auto space-y-4">
       <AppHeader current="/recipes" />
       <div className="flex items-center justify-between gap-4">
         <Link

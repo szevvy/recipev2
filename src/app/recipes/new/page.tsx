@@ -12,7 +12,7 @@ export default async function NewRecipePage() {
     .order("name", { ascending: true });
 
   return (
-    <main className="min-h-screen p-6 max-w-5xl mx-auto space-y-6">
+    <main className="min-h-screen p-6 max-w-6xl mx-auto space-y-6">
       <AppHeader current="/recipes" />
       <div>
         <h1 className="font-serif text-3xl text-[var(--foreground)]">New recipe</h1>

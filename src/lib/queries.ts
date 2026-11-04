@@ -1,0 +1,49 @@
+"use client";
+
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  AppSettings,
+  CategoryMetaRow,
+  Ingredient,
+  MealPlanWithRecipe,
+  Recipe,
+  ShoppingItemWithIngredient,
+} from "./types";
+
+export type BootstrapData = {
+  settings: AppSettings;
+  weekStart: string;
+  shoppingItems: ShoppingItemWithIngredient[];
+  ingredients: Ingredient[];
+  recipes: Array<
+    Pick<Recipe, "id" | "name" | "image_url" | "default_servings" | "prep_minutes" | "cook_minutes"> & {
+      recipe_ingredients: { id: string }[];
+    }
+  >;
+  meals: MealPlanWithRecipe[];
+  categoryMeta: CategoryMetaRow[];
+};
+
+async function fetchBootstrap(): Promise<BootstrapData> {
+  const res = await fetch("/api/bootstrap", { cache: "no-store" });
+  const json = (await res.json()) as
+    | { ok: true; data: BootstrapData }
+    | { ok: false; error: string };
+  if (!json.ok) throw new Error(json.error);
+  return json.data;
+}
+
+export const BOOTSTRAP_KEY = ["bootstrap"] as const;
+
+export function useBootstrap() {
+  return useQuery({
+    queryKey: BOOTSTRAP_KEY,
+    queryFn: fetchBootstrap,
+  });
+}
+
+// Call after any mutation that affects shopping/plan/recipes/ingredients.
+export function useInvalidateBootstrap() {
+  const qc = useQueryClient();
+  return () => qc.invalidateQueries({ queryKey: BOOTSTRAP_KEY });
+}

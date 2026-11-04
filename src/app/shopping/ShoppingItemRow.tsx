@@ -3,8 +3,13 @@
 import { useEffect, useState, useTransition } from "react";
 import { Check, Home, PencilLine, ShoppingBasket, Sparkles, Utensils } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ShoppingItemState, ShoppingItemWithIngredient } from "@/lib/types";
-import { useInvalidateBootstrap } from "@/lib/queries";
+import {
+  BOOTSTRAP_KEY,
+  useInvalidateBootstrap,
+  type BootstrapData,
+} from "@/lib/queries";
 import {
   removeShoppingItemAction,
   setItemNotesAction,
@@ -30,37 +35,67 @@ export function ShoppingItemRow({
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const invalidate = useInvalidateBootstrap();
+  const qc = useQueryClient();
 
   useEffect(() => {
     setState(item.state);
   }, [item.state]);
 
+  function patchCacheState(newState: ShoppingItemState) {
+    // Patch the shared bootstrap cache in place so the parent list re-filters
+    // (e.g. moves this row into or out of the Already-have drawer) without a
+    // full refetch. Avoids the ~300ms /api/bootstrap round-trip and SPA
+    // re-render that was causing a visible scroll nudge on mobile.
+    qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        shoppingItems: old.shoppingItems.map((i) =>
+          i.id === item.id ? { ...i, state: newState } : i,
+        ),
+      };
+    });
+  }
+
   function update(next: ShoppingItemState) {
     if (next === state) return;
     const previous = state;
     setState(next);
+    patchCacheState(next);
     setError(null);
     startTransition(async () => {
       const result = await setItemStateAction(item.id, next);
       if (!result.ok) {
         setState(previous);
+        patchCacheState(previous);
         setError(result.error);
-        return;
       }
-      invalidate();
     });
   }
 
   function remove() {
+    const previousItems = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY)?.shoppingItems;
     setRemoved(true);
+    qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        shoppingItems: old.shoppingItems.filter((i) => i.id !== item.id),
+      };
+    });
     startTransition(async () => {
       const result = await removeShoppingItemAction(item.id);
       if (!result.ok) {
         setRemoved(false);
+        if (previousItems) {
+          qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) =>
+            old ? { ...old, shoppingItems: previousItems } : old,
+          );
+        } else {
+          invalidate();
+        }
         setError(result.error);
-        return;
       }
-      invalidate();
     });
   }
 
@@ -239,17 +274,26 @@ export function HaveRow({ item }: { item: ShoppingItemWithIngredient }) {
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const invalidate = useInvalidateBootstrap();
+  const qc = useQueryClient();
 
   function moveToBuy() {
     setMoving(true);
+    qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        shoppingItems: old.shoppingItems.map((i) =>
+          i.id === item.id ? { ...i, state: "to_buy" } : i,
+        ),
+      };
+    });
     startTransition(async () => {
       const result = await setItemStateAction(item.id, "to_buy");
       if (!result.ok) {
         setMoving(false);
+        invalidate();
         setError(result.error);
-        return;
       }
-      invalidate();
     });
   }
 

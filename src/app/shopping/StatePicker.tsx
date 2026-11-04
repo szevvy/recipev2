@@ -63,11 +63,11 @@ export function StatePicker({
     return () => document.removeEventListener("mousedown", onDown);
   }, []);
 
-  // 'bought' shows as neutral — the bought check is the control for that state.
-  const current =
-    state === "bought"
-      ? null
-      : OPTIONS.find((o) => o.value === state) ?? OPTIONS[0];
+  // When an item is bought, keep showing its 'to_buy' chip (basket) so the
+  // picker always reflects a real option — ticking bought no longer swaps
+  // every icon to a grey question mark.
+  const displayValue: PickState = state === "bought" ? "to_buy" : state;
+  const current = OPTIONS.find((o) => o.value === displayValue) ?? OPTIONS[0];
 
   return (
     <div ref={wrapRef} className="relative shrink-0">
@@ -76,12 +76,10 @@ export function StatePicker({
         onClick={() => setOpen((o) => !o)}
         className={
           "inline-flex items-center gap-1 h-7 pl-1.5 pr-1 rounded-full border transition-colors " +
-          (current
-            ? current.activeClass
-            : "border-[var(--border)] text-[var(--muted)] bg-transparent hover:bg-[var(--surface-muted)]")
+          current.activeClass
         }
       >
-        {current ? <current.Icon size={14} /> : <HelpCircle size={14} />}
+        <current.Icon size={14} />
         <ChevronDown size={12} />
       </button>
       {open && (

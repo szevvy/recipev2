@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import type { Ingredient } from "@/lib/types";
 import { IngredientPicker } from "@/components/IngredientPicker";
+import { useInvalidateBootstrap } from "@/lib/queries";
 import { addManualItemAction, addOneOffItemAction } from "./actions";
 
 export function AddManualItem({ ingredients }: { ingredients: Ingredient[] }) {
@@ -14,6 +15,7 @@ export function AddManualItem({ ingredients }: { ingredients: Ingredient[] }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const qtyRef = useRef<HTMLInputElement>(null);
+  const invalidate = useInvalidateBootstrap();
 
   function submit() {
     const typed = query.trim();
@@ -40,6 +42,7 @@ export function AddManualItem({ ingredients }: { ingredients: Ingredient[] }) {
       setIngredientId(null);
       setQuery("");
       setQuantity("");
+      invalidate();
     });
   }
 

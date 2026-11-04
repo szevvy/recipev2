@@ -2,15 +2,18 @@
 
 import { useTransition } from "react";
 import { CheckCircle2 } from "lucide-react";
+import { useInvalidateBootstrap } from "@/lib/queries";
 import { finishShoppingAction } from "./actions";
 
 export function FinishShoppingButton() {
   const [pending, startTransition] = useTransition();
+  const invalidate = useInvalidateBootstrap();
 
   function onClick() {
     if (!confirm("Finish shopping? This clears bought items and resets staples.")) return;
     startTransition(async () => {
-      await finishShoppingAction();
+      const result = await finishShoppingAction();
+      if (result.ok) invalidate();
     });
   }
 

@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { StarToggleHidden } from "@/components/StarButton";
 import { GroupCombobox } from "@/components/GroupCombobox";
+import { useInvalidateBootstrap } from "@/lib/queries";
 import { createIngredientAction, type ActionResult } from "./actions";
 
 async function wrappedAction(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
@@ -17,13 +18,15 @@ export function AddIngredientForm({ groupSuggestions }: { groupSuggestions: stri
   );
   const [isStaple, setIsStaple] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const invalidate = useInvalidateBootstrap();
 
   useEffect(() => {
     if (state?.ok) {
       formRef.current?.reset();
       setIsStaple(false);
+      invalidate();
     }
-  }, [state]);
+  }, [state, invalidate]);
 
   return (
     <form

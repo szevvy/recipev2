@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { LogOut, Menu, Settings as SettingsIcon } from "lucide-react";
 import Link from "next/link";
 import { useBootstrap } from "@/lib/queries";
+import { TabButton } from "./_tabs/TabButton";
+import { ShoppingTab } from "./_tabs/ShoppingTab";
+import { PlanTab } from "./_tabs/PlanTab";
+import { RecipesTab } from "./_tabs/RecipesTab";
+import { IngredientsTab } from "./_tabs/IngredientsTab";
 
 type TabId = "shopping" | "plan" | "recipes" | "ingredients";
 
@@ -25,7 +30,6 @@ export function HomeSpa() {
   const [tab, setTab] = useState<TabId>(() => readInitialTab());
   const bootstrap = useBootstrap();
 
-  // Keep URL in sync with the active tab so deep links / back-forward work.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const current = new URLSearchParams(window.location.search).get("tab");
@@ -36,20 +40,33 @@ export function HomeSpa() {
   }, [tab]);
 
   return (
-    <main className="min-h-screen p-6 max-w-5xl mx-auto space-y-6">
+    <main className="min-h-screen p-6 max-w-6xl mx-auto space-y-6">
       <ShellHeader tab={tab} onChangeTab={setTab} />
       {bootstrap.isPending ? (
-        <TabFrame>
+        <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5">
           <p className="text-sm text-[var(--muted)] italic">Loading your kitchen…</p>
-        </TabFrame>
+        </section>
       ) : bootstrap.isError ? (
-        <TabFrame>
+        <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5">
           <p className="text-sm text-red-600">
             Couldn&apos;t load: {(bootstrap.error as Error).message}
           </p>
-        </TabFrame>
+        </section>
       ) : (
-        <TabBody tab={tab} data={bootstrap.data} />
+        <>
+          <div hidden={tab !== "shopping"}>
+            <ShoppingTab data={bootstrap.data} />
+          </div>
+          <div hidden={tab !== "plan"}>
+            <PlanTab data={bootstrap.data} />
+          </div>
+          <div hidden={tab !== "recipes"}>
+            <RecipesTab data={bootstrap.data} />
+          </div>
+          <div hidden={tab !== "ingredients"}>
+            <IngredientsTab data={bootstrap.data} />
+          </div>
+        </>
       )}
     </main>
   );
@@ -73,20 +90,14 @@ function ShellHeader({
         >
           Kitchen
         </button>
-        <nav className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+        <nav className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm">
           {TABS.map((t) => (
-            <button
+            <TabButton
               key={t.id}
-              type="button"
+              label={t.label}
+              active={t.id === tab}
               onClick={() => onChangeTab(t.id)}
-              className={
-                t.id === tab
-                  ? "font-semibold text-[var(--accent)]"
-                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
-              }
-            >
-              {t.label}
-            </button>
+            />
           ))}
         </nav>
       </div>
@@ -126,78 +137,5 @@ function ShellHeader({
         )}
       </div>
     </header>
-  );
-}
-
-function TabFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5">
-      {children}
-    </section>
-  );
-}
-
-function TabBody({ tab, data }: { tab: TabId; data: ReturnType<typeof useBootstrap>["data"] }) {
-  if (!data) return null;
-  return (
-    <>
-      <div hidden={tab !== "shopping"}>
-        <TabFrame>
-          <p className="text-sm text-[var(--muted)]">
-            Shopping tab coming next. Bootstrap returned {data.shoppingItems.length}{" "}
-            shopping items, {data.ingredients.length} ingredients, {data.meals.length} meals this week.
-          </p>
-          <p className="text-xs text-[var(--muted)] mt-2">
-            For now the real shopping page lives at{" "}
-            <Link href="/shopping" className="text-[var(--accent)] hover:underline">
-              /shopping
-            </Link>
-            .
-          </p>
-        </TabFrame>
-      </div>
-      <div hidden={tab !== "plan"}>
-        <TabFrame>
-          <p className="text-sm text-[var(--muted)]">
-            Plan tab coming next. Current week starts {data.weekStart}.
-          </p>
-          <p className="text-xs text-[var(--muted)] mt-2">
-            Real plan page still at{" "}
-            <Link href="/plan" className="text-[var(--accent)] hover:underline">
-              /plan
-            </Link>
-            .
-          </p>
-        </TabFrame>
-      </div>
-      <div hidden={tab !== "recipes"}>
-        <TabFrame>
-          <p className="text-sm text-[var(--muted)]">
-            Recipes tab coming next. {data.recipes.length} recipes loaded.
-          </p>
-          <p className="text-xs text-[var(--muted)] mt-2">
-            Real recipes page still at{" "}
-            <Link href="/recipes" className="text-[var(--accent)] hover:underline">
-              /recipes
-            </Link>
-            .
-          </p>
-        </TabFrame>
-      </div>
-      <div hidden={tab !== "ingredients"}>
-        <TabFrame>
-          <p className="text-sm text-[var(--muted)]">
-            Ingredients tab coming next. {data.ingredients.length} ingredients loaded.
-          </p>
-          <p className="text-xs text-[var(--muted)] mt-2">
-            Real ingredients page still at{" "}
-            <Link href="/ingredients" className="text-[var(--accent)] hover:underline">
-              /ingredients
-            </Link>
-            .
-          </p>
-        </TabFrame>
-      </div>
-    </>
   );
 }

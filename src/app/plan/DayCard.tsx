@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Plus, X } from "lucide-react";
 import { format, isToday, isPast } from "date-fns";
 import type { MealPlanWithRecipe, Recipe } from "@/lib/types";
+import { useInvalidateBootstrap } from "@/lib/queries";
 import { clearMealAction, setMealAction } from "./actions";
 import { RecipeModal } from "./RecipeModal";
 
@@ -26,6 +27,7 @@ export function DayCard({
   const [mealLocal, setMealLocal] = useState<MealPlanWithRecipe | null>(meal);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const invalidate = useInvalidateBootstrap();
   const dateIso = format(date, "yyyy-MM-dd");
   const today = isToday(date);
   const past = !today && isPast(date);
@@ -77,7 +79,9 @@ export function DayCard({
       if (!result.ok) {
         setMealLocal(previous);
         setError(result.error);
+        return;
       }
+      invalidate();
     });
   }
 
@@ -99,7 +103,9 @@ export function DayCard({
       if (!result.ok) {
         setMealLocal(previous);
         setError(result.error);
+        return;
       }
+      invalidate();
     });
   }
 

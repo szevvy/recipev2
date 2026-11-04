@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Check, Home, PencilLine, ShoppingBasket, Sparkles, Utensils } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { ShoppingItemState, ShoppingItemWithIngredient } from "@/lib/types";
+import { useInvalidateBootstrap } from "@/lib/queries";
 import {
   removeShoppingItemAction,
   setItemNotesAction,
@@ -28,6 +29,7 @@ export function ShoppingItemRow({
   const [removed, setRemoved] = useState(false);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const invalidate = useInvalidateBootstrap();
 
   useEffect(() => {
     setState(item.state);
@@ -43,7 +45,9 @@ export function ShoppingItemRow({
       if (!result.ok) {
         setState(previous);
         setError(result.error);
+        return;
       }
+      invalidate();
     });
   }
 
@@ -54,7 +58,9 @@ export function ShoppingItemRow({
       if (!result.ok) {
         setRemoved(false);
         setError(result.error);
+        return;
       }
+      invalidate();
     });
   }
 
@@ -151,6 +157,7 @@ function ExpandedPanel({ item }: { item: ShoppingItemWithIngredient }) {
   const [notes, setNotes] = useState(item.notes ?? "");
   const [saved, setSaved] = useState(false);
   const [, startTransition] = useTransition();
+  const invalidate = useInvalidateBootstrap();
 
   useEffect(() => {
     setNotes(item.notes ?? "");
@@ -165,6 +172,7 @@ function ExpandedPanel({ item }: { item: ShoppingItemWithIngredient }) {
       if (result.ok) {
         setSaved(true);
         setTimeout(() => setSaved(false), 1200);
+        invalidate();
       }
     });
   }
@@ -230,6 +238,7 @@ export function HaveRow({ item }: { item: ShoppingItemWithIngredient }) {
   const [moving, setMoving] = useState(false);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const invalidate = useInvalidateBootstrap();
 
   function moveToBuy() {
     setMoving(true);
@@ -238,7 +247,9 @@ export function HaveRow({ item }: { item: ShoppingItemWithIngredient }) {
       if (!result.ok) {
         setMoving(false);
         setError(result.error);
+        return;
       }
+      invalidate();
     });
   }
 

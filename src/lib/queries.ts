@@ -45,5 +45,30 @@ export function useBootstrap() {
 // Call after any mutation that affects shopping/plan/recipes/ingredients.
 export function useInvalidateBootstrap() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: BOOTSTRAP_KEY });
+  return () => {
+    qc.invalidateQueries({ queryKey: BOOTSTRAP_KEY });
+    qc.invalidateQueries({ queryKey: ["plan"] });
+  };
+}
+
+export const planKey = (weekStartIso: string) => ["plan", weekStartIso] as const;
+
+async function fetchPlanWeek(weekStartIso: string): Promise<MealPlanWithRecipe[]> {
+  const res = await fetch(`/api/plan?week=${weekStartIso}`, { cache: "no-store" });
+  const json = (await res.json()) as
+    | { ok: true; meals: MealPlanWithRecipe[] }
+    | { ok: false; error: string };
+  if (!json.ok) throw new Error(json.error);
+  return json.meals;
+}
+
+export function usePlanWeek(
+  weekStartIso: string,
+  initialData?: MealPlanWithRecipe[],
+) {
+  return useQuery({
+    queryKey: planKey(weekStartIso),
+    queryFn: () => fetchPlanWeek(weekStartIso),
+    initialData,
+  });
 }

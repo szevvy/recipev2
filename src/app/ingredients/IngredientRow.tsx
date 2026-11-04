@@ -5,6 +5,7 @@ import { Pencil, Trash2, Check, X } from "lucide-react";
 import type { Ingredient } from "@/lib/types";
 import { StarButton, StarToggleHidden } from "@/components/StarButton";
 import { GroupCombobox } from "@/components/GroupCombobox";
+import { useInvalidateBootstrap } from "@/lib/queries";
 import {
   deleteIngredientAction,
   toggleStapleAction,
@@ -24,6 +25,7 @@ export function IngredientRow({
   const [deletedLocal, setDeletedLocal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const invalidate = useInvalidateBootstrap();
 
   useEffect(() => {
     setIsStapleLocal(ingredient.is_staple);
@@ -49,6 +51,7 @@ export function IngredientRow({
         return;
       }
       setEditing(false);
+      invalidate();
     });
   }
 
@@ -61,7 +64,9 @@ export function IngredientRow({
       if (!result.ok) {
         setDeletedLocal(false);
         setError(result.error);
+        return;
       }
+      invalidate();
     });
   }
 
@@ -74,7 +79,9 @@ export function IngredientRow({
       if (!result.ok) {
         setIsStapleLocal(!next);
         setError(result.error);
+        return;
       }
+      invalidate();
     });
   }
 

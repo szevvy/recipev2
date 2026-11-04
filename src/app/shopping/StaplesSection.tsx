@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { ChevronDown, Sparkles } from "lucide-react";
 import { paletteColor } from "@/lib/category-palette";
+import { useInvalidateBootstrap } from "@/lib/queries";
 import type { CategoryMetaRow, ShoppingItemState } from "@/lib/types";
 import { setStapleStateAction } from "./actions";
 import { StatePicker } from "./StatePicker";
@@ -143,6 +144,7 @@ function StapleRow({
   const [state, setState] = useState<ShoppingItemState>(item.state);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const invalidate = useInvalidateBootstrap();
 
   useEffect(() => {
     setState(item.state);
@@ -158,7 +160,9 @@ function StapleRow({
       if (!result.ok) {
         setState(previous);
         setError(result.error);
+        return;
       }
+      invalidate();
     });
   }
 

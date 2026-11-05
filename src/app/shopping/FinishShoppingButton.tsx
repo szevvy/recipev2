@@ -23,16 +23,33 @@ export function FinishShoppingButton() {
 
     // Mirror the server's finish steps on the cache so the list clears
     // immediately: drop bought+have rows, reset remaining staples to
-    // not_checked, stamp current meals as shopped so sync won't re-add them.
+    // not_checked, stamp current meals as shopped so sync won't re-add them,
+    // and roll forward latestPurchases so "last bought" badges refresh.
     qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
       if (!old) return old;
+      const boughtIngredientIds = new Set(
+        old.shoppingItems
+          .filter((i) => i.state === "bought" && i.ingredient_id)
+          .map((i) => i.ingredient_id as string),
+      );
       const shoppingItems = old.shoppingItems
         .filter((i) => i.state !== "bought" && i.state !== "have")
         .map((i) => (i.source === "staple" ? { ...i, state: "not_checked" as const } : i));
       const meals = old.meals.map((m) =>
         m.shopped_at ? m : { ...m, shopped_at: nowIso },
       );
-      return { ...old, shoppingItems, meals };
+      const touched = new Set<string>();
+      const latestPurchases = old.latestPurchases.map((p) => {
+        if (boughtIngredientIds.has(p.ingredient_id)) {
+          touched.add(p.ingredient_id);
+          return { ...p, purchased_at: nowIso };
+        }
+        return p;
+      });
+      for (const id of boughtIngredientIds) {
+        if (!touched.has(id)) latestPurchases.push({ ingredient_id: id, purchased_at: nowIso });
+      }
+      return { ...old, shoppingItems, meals, latestPurchases };
     });
 
     startTransition(async () => {

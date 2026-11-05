@@ -28,6 +28,7 @@ export async function GET() {
     recipesResp,
     mealsResp,
     categoryMetaResp,
+    latestPurchasesResp,
   ] = await Promise.all([
     supabase
       .from("shopping_items")
@@ -49,6 +50,7 @@ export async function GET() {
       .lte("date", weekEndIso)
       .is("slot", null),
     supabase.from("category_meta").select("*"),
+    supabase.from("latest_purchases").select("ingredient_id, purchased_at"),
   ]);
 
   const firstErr =
@@ -56,7 +58,8 @@ export async function GET() {
     ingredientsResp.error ??
     recipesResp.error ??
     mealsResp.error ??
-    categoryMetaResp.error;
+    categoryMetaResp.error ??
+    latestPurchasesResp.error;
   if (firstErr) {
     return NextResponse.json({ ok: false, error: firstErr.message }, { status: 500 });
   }
@@ -71,6 +74,7 @@ export async function GET() {
       recipes: recipesResp.data ?? [],
       meals: mealsResp.data ?? [],
       categoryMeta: categoryMetaResp.data ?? [],
+      latestPurchases: latestPurchasesResp.data ?? [],
     },
   });
 }

@@ -22,7 +22,25 @@ export type StapleView = {
   name: string;
   group_name: string | null;
   state: ShoppingItemState;
+  last_purchased_at: string | null;
 };
+
+// Terse "last bought" badge. Keeps the row scannable:
+//   today · yest · 3d · 2w · 3mo · 1y
+function formatLastPurchased(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const days = Math.floor((Date.now() - then) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yest";
+  if (days < 7) return `${days}d`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4) return `${weeks}w`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo`;
+  const years = Math.floor(days / 365);
+  return `${years}y`;
+}
 
 const UNGROUPED = "__ungrouped__";
 
@@ -233,12 +251,25 @@ function StapleRow({
   }
 
   const nameStyle = chipText ? { color: `${chipText}d9` } : undefined;
+  const ageStyle = chipText ? { color: `${chipText}99` } : undefined;
+  const lastBought = item.last_purchased_at
+    ? formatLastPurchased(item.last_purchased_at)
+    : null;
 
   return (
     <li className="flex items-center gap-2 px-2 py-1.5">
       <span className="flex-1 text-sm truncate" style={nameStyle}>
         {item.name}
       </span>
+      {lastBought && (
+        <span
+          className="text-[10px] tabular-nums text-[var(--muted)] shrink-0"
+          style={ageStyle}
+          title={`Last bought ${new Date(item.last_purchased_at!).toLocaleDateString()}`}
+        >
+          {lastBought}
+        </span>
+      )}
       {error && <span className="text-xs text-red-600">{error}</span>}
       <StatePicker state={state} onChange={update} />
     </li>

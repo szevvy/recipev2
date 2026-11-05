@@ -22,6 +22,7 @@ export type BootstrapData = {
   >;
   meals: MealPlanWithRecipe[];
   categoryMeta: CategoryMetaRow[];
+  latestPurchases: Array<{ ingredient_id: string; purchased_at: string }>;
 };
 
 async function fetchBootstrap(): Promise<BootstrapData> {

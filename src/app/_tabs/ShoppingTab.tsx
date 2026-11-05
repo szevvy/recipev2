@@ -16,6 +16,7 @@ export function ShoppingTab({ data }: { data: BootstrapData }) {
   const items = data.shoppingItems as ShoppingItemWithIngredient[];
   const ingredients = data.ingredients as Ingredient[];
   const categoryMeta = data.categoryMeta;
+  const latestPurchases = data.latestPurchases;
 
   const { active, have, staples, counts } = useMemo(() => {
     const active = items.filter((i) => i.state !== "have");
@@ -27,6 +28,10 @@ export function ShoppingTab({ data }: { data: BootstrapData }) {
         stapleRowByIngredient.set(item.ingredient_id, item);
       }
     }
+    const lastPurchasedByIngredient = new Map<string, string>();
+    for (const p of latestPurchases) {
+      lastPurchasedByIngredient.set(p.ingredient_id, p.purchased_at);
+    }
     const staples: StapleView[] = ingredients
       .filter((i) => i.is_staple)
       .map((i) => ({
@@ -34,6 +39,7 @@ export function ShoppingTab({ data }: { data: BootstrapData }) {
         name: i.name,
         group_name: i.group_name,
         state: stapleRowByIngredient.get(i.id)?.state ?? "not_checked",
+        last_purchased_at: lastPurchasedByIngredient.get(i.id) ?? null,
       }));
 
     const counts = {
@@ -43,7 +49,7 @@ export function ShoppingTab({ data }: { data: BootstrapData }) {
     };
 
     return { active, have, staples, counts };
-  }, [items, ingredients]);
+  }, [items, ingredients, latestPurchases]);
 
   return (
     <div className="space-y-6">

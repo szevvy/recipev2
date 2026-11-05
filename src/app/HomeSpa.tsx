@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LogOut, Menu, Settings as SettingsIcon } from "lucide-react";
 import Link from "next/link";
-import { useBootstrap } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
+import { BOOTSTRAP_KEY, useBootstrap } from "@/lib/queries";
 import { TabButton } from "./_tabs/TabButton";
 import { ShoppingTab } from "./_tabs/ShoppingTab";
 import { PlanTab } from "./_tabs/PlanTab";
@@ -27,6 +28,8 @@ function tabFromPathname(pathname: string): TabId {
 export function HomeSpa({ initialTab }: { initialTab: TabId }) {
   const [tab, setTab] = useState<TabId>(initialTab);
   const bootstrap = useBootstrap();
+  const qc = useQueryClient();
+  const firstTabRender = useRef(true);
 
   // Keep the URL + local state in sync as the user switches tabs and uses
   // browser back/forward. Each tab is its own history entry (pushState) so
@@ -41,6 +44,20 @@ export function HomeSpa({ initialTab }: { initialTab: TabId }) {
       }
     }
   }, [tab]);
+
+  // Any time the user navigates to a tab, fetch fresh bootstrap in the
+  // background. /api/bootstrap runs syncShoppingList() first, so visiting
+  // Shopping after adding a meal on Plan picks up the new items. React Query
+  // keeps serving cached data until the new payload arrives, then stable row
+  // keys turn the swap into an in-place add/remove/update (preserves scroll).
+  useEffect(() => {
+    if (firstTabRender.current) {
+      // useBootstrap's own first fetch covers the initial render.
+      firstTabRender.current = false;
+      return;
+    }
+    qc.refetchQueries({ queryKey: BOOTSTRAP_KEY });
+  }, [tab, qc]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

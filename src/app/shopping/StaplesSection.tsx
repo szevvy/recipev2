@@ -63,12 +63,15 @@ export function StaplesSection({
   });
 
   return (
-    <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm overflow-hidden">
+    <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-[var(--surface-muted)] transition-colors"
+        className={
+          "w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-[var(--surface-muted)] transition-colors " +
+          (open ? "rounded-t-2xl" : "rounded-2xl")
+        }
       >
         <div className="flex items-baseline gap-3 min-w-0">
           <div className="flex items-center gap-2">

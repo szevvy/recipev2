@@ -12,6 +12,7 @@ import type {
   ShoppingItemWithIngredient,
 } from "@/lib/types";
 import { DayCard } from "@/app/plan/DayCard";
+import { buildMealIngredients } from "@/app/plan/mealIngredients";
 import {
   StaplesSection,
   type StapleView,
@@ -49,28 +50,17 @@ export function PlanTab({ data }: { data: BootstrapData }) {
   const mealByDate = new Map<string, MealPlanWithRecipe>();
   for (const m of meals) mealByDate.set(m.date, m);
 
-  // Group shopping items by contributing meal_plan_id so each day card can
-  // render its own ingredient list with the same state-picker + bought-check
-  // controls as the shopping list.
-  const itemsByMealId = useMemo(() => {
-    const map = new Map<string, ShoppingItemWithIngredient[]>();
-    for (const item of shoppingItems) {
-      for (const source of item.shopping_item_sources) {
-        if (!source.meal_plan_id) continue;
-        const list = map.get(source.meal_plan_id) ?? [];
-        if (!list.find((i) => i.id === item.id)) list.push(item);
-        map.set(source.meal_plan_id, list);
-      }
-    }
-    for (const list of map.values()) {
-      list.sort((a, b) => {
-        const an = a.ingredients?.name ?? a.name ?? "";
-        const bn = b.ingredients?.name ?? b.name ?? "";
-        return an.localeCompare(bn);
-      });
+  // Resolve each meal's complete ingredient list (from recipe_ingredients /
+  // meal_plan_custom_ingredients) and link each to its shopping_items row
+  // if one exists. Previously we derived this from the sources side, which
+  // missed any ingredient that was globally in "have" state.
+  const ingredientsByMealId = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof buildMealIngredients>>();
+    for (const meal of meals) {
+      map.set(meal.id, buildMealIngredients(meal, shoppingItems));
     }
     return map;
-  }, [shoppingItems]);
+  }, [meals, shoppingItems]);
 
   // Build staple views here (staples now live on the plan tab) and keep the
   // existing StaplesSection unchanged.
@@ -145,7 +135,9 @@ export function PlanTab({ data }: { data: BootstrapData }) {
           {days.map((d) => {
             const dateIso = format(d, "yyyy-MM-dd");
             const dayMeal = mealByDate.get(dateIso) ?? null;
-            const mealItems = dayMeal ? itemsByMealId.get(dayMeal.id) ?? [] : [];
+            const mealIngredients = dayMeal
+              ? ingredientsByMealId.get(dayMeal.id) ?? []
+              : [];
             return (
               <DayCard
                 key={dateIso}
@@ -153,7 +145,7 @@ export function PlanTab({ data }: { data: BootstrapData }) {
                 meal={dayMeal}
                 recipes={recipes}
                 ingredients={ingredients}
-                mealItems={mealItems}
+                mealIngredients={mealIngredients}
               />
             );
           })}

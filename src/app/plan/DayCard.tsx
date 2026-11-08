@@ -9,8 +9,8 @@ import type {
   Ingredient,
   MealPlanWithRecipe,
   Recipe,
-  ShoppingItemWithIngredient,
 } from "@/lib/types";
+import type { MealIngredientView } from "./mealIngredients";
 import {
   BOOTSTRAP_KEY,
   useInvalidateBootstrap,
@@ -36,15 +36,15 @@ export function DayCard({
   meal,
   recipes,
   ingredients,
-  mealItems,
+  mealIngredients,
 }: {
   date: Date;
   meal: MealPlanWithRecipe | null;
   recipes: RecipeOption[];
   ingredients: Ingredient[];
-  // Shopping items contributed to by this meal (via shopping_item_sources).
-  // Used to render the per-meal ingredient list with state pickers.
-  mealItems: ShoppingItemWithIngredient[];
+  // Complete per-meal ingredient list (resolved from recipe/custom data,
+  // not from shopping-item sources) — so "have" items still show up.
+  mealIngredients: MealIngredientView[];
 }) {
   const [picking, setPicking] = useState(false);
   const [editingCustom, setEditingCustom] = useState(false);
@@ -117,6 +117,9 @@ export function DayCard({
         name: recipe.name,
         default_servings: recipe.default_servings,
         image_url: recipe.image_url,
+        // Optimistic — real recipe_ingredients arrive with the next bootstrap
+        // refetch; the day card ingredient panel just shows empty until then.
+        recipe_ingredients: [],
       },
       meal_plan_custom_ingredients: [],
     };
@@ -132,11 +135,11 @@ export function DayCard({
         setError(result.error);
         return;
       }
-      // Shopping list items change server-side (sync + orphan cleanup), so
-      // refresh bootstrap when we touched the shopping side too. Also when
-      // the old meal was a custom one, since its free-text shopping items
-      // were cleared.
-      if (removeOldIngredients || (previous && !previous.recipes)) invalidate();
+      // Always refresh bootstrap after picking a recipe: sync just ran
+      // server-side (adding/merging shopping items), and the optimistic
+      // meal object doesn't carry recipe_ingredients yet — the ingredient
+      // panel needs the real payload to populate.
+      invalidate();
     });
   }
 
@@ -322,7 +325,7 @@ export function DayCard({
             ) : (
               <span />
             )}
-            {mealItems.length > 0 && (
+            {mealIngredients.length > 0 && (
               <button
                 type="button"
                 onClick={() => setExpanded((e) => !e)}
@@ -330,7 +333,7 @@ export function DayCard({
                 title={expanded ? "Hide ingredients" : "Show ingredients"}
                 className="inline-flex items-center gap-1 text-xs text-[var(--muted)] hover:text-[var(--accent)]"
               >
-                {mealItems.length} ingredient{mealItems.length === 1 ? "" : "s"}
+                {mealIngredients.length} ingredient{mealIngredients.length === 1 ? "" : "s"}
                 <ChevronDown
                   size={12}
                   className={"transition-transform " + (expanded ? "rotate-180" : "")}
@@ -339,20 +342,11 @@ export function DayCard({
             )}
           </div>
         )}
-        {expanded && mealItems.length > 0 && mealLocal && (
+        {expanded && mealIngredients.length > 0 && mealLocal && (
           <ul className="border-t border-[var(--border)]/60 pt-2 space-y-0.5">
-            {mealItems.map((item) => {
-              const source = item.shopping_item_sources.find(
-                (s) => s.meal_plan_id === mealLocal.id,
-              );
-              return (
-                <MealIngredientRow
-                  key={item.id}
-                  item={item}
-                  displayQuantity={source?.quantity ?? null}
-                />
-              );
-            })}
+            {mealIngredients.map((view) => (
+              <MealIngredientRow key={view.key} view={view} />
+            ))}
           </ul>
         )}
         {error && <p className="text-xs text-red-600">{error}</p>}

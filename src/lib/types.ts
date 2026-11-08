@@ -57,8 +57,23 @@ export type MealPlanCustomIngredientWithLink = MealPlanCustomIngredient & {
   ingredients: Pick<Ingredient, "id" | "name" | "group_name"> | null;
 };
 
+export type RecipeIngredientWithLink = {
+  id: string;
+  ingredient_id: string;
+  quantity: string | null;
+  sort_order: number;
+  ingredients: Pick<Ingredient, "id" | "name" | "group_name"> | null;
+};
+
+export type MealPlanRecipeView = Pick<
+  Recipe,
+  "id" | "name" | "default_servings" | "image_url"
+> & {
+  recipe_ingredients: RecipeIngredientWithLink[];
+};
+
 export type MealPlanWithRecipe = MealPlanEntry & {
-  recipes: Pick<Recipe, "id" | "name" | "default_servings" | "image_url"> | null;
+  recipes: MealPlanRecipeView | null;
   meal_plan_custom_ingredients: MealPlanCustomIngredientWithLink[];
 };
 

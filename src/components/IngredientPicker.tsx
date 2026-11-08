@@ -40,12 +40,15 @@ export function IngredientPicker({
     function onDown(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setOpen(false);
-        setQuery(selected?.name ?? "");
+        // Only snap back to the picked ingredient's name — never clobber
+        // free-text the user typed without picking. The parent tracks that
+        // text via onQueryChange and may be using it as a one-off entry.
+        if (selected) setQuery(selected.name);
       }
     }
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [selected?.name]);
+  }, [selected]);
 
   const q = query.trim().toLowerCase();
   const filtered = q

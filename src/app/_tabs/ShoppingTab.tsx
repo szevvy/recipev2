@@ -7,40 +7,15 @@ import { AddManualItem } from "@/app/shopping/AddManualItem";
 import { FinishShoppingButton } from "@/app/shopping/FinishShoppingButton";
 import { HaveSection } from "@/app/shopping/HaveSection";
 import { ShoppingList } from "@/app/shopping/ShoppingList";
-import {
-  StaplesSection,
-  type StapleView,
-} from "@/app/shopping/StaplesSection";
 
 export function ShoppingTab({ data }: { data: BootstrapData }) {
   const items = data.shoppingItems as ShoppingItemWithIngredient[];
   const ingredients = data.ingredients as Ingredient[];
   const categoryMeta = data.categoryMeta;
-  const latestPurchases = data.latestPurchases;
 
-  const { active, have, staples, counts } = useMemo(() => {
+  const { active, have, counts } = useMemo(() => {
     const active = items.filter((i) => i.state !== "have");
     const have = items.filter((i) => i.state === "have");
-
-    const stapleRowByIngredient = new Map<string, ShoppingItemWithIngredient>();
-    for (const item of items) {
-      if (item.source === "staple" && item.ingredient_id) {
-        stapleRowByIngredient.set(item.ingredient_id, item);
-      }
-    }
-    const lastPurchasedByIngredient = new Map<string, string>();
-    for (const p of latestPurchases) {
-      lastPurchasedByIngredient.set(p.ingredient_id, p.purchased_at);
-    }
-    const staples: StapleView[] = ingredients
-      .filter((i) => i.is_staple)
-      .map((i) => ({
-        ingredient_id: i.id,
-        name: i.name,
-        group_name: i.group_name,
-        state: stapleRowByIngredient.get(i.id)?.state ?? "not_checked",
-        last_purchased_at: lastPurchasedByIngredient.get(i.id) ?? null,
-      }));
 
     const counts = {
       toBuy: active.filter((i) => i.state === "to_buy").length,
@@ -48,8 +23,8 @@ export function ShoppingTab({ data }: { data: BootstrapData }) {
       bought: active.filter((i) => i.state === "bought").length,
     };
 
-    return { active, have, staples, counts };
-  }, [items, ingredients, latestPurchases]);
+    return { active, have, counts };
+  }, [items]);
 
   return (
     <div className="space-y-6">
@@ -77,8 +52,6 @@ export function ShoppingTab({ data }: { data: BootstrapData }) {
       <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-4">
         <ShoppingList items={active} categoryMeta={categoryMeta} />
       </section>
-
-      <StaplesSection staples={staples} categoryMeta={categoryMeta} />
 
       <HaveSection items={have} />
 

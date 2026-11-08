@@ -5,8 +5,17 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { addDays, format, parseISO, startOfWeek } from "date-fns";
 import type { BootstrapData } from "@/lib/queries";
 import { usePlanWeek } from "@/lib/queries";
-import type { Ingredient, MealPlanWithRecipe, Recipe } from "@/lib/types";
+import type {
+  Ingredient,
+  MealPlanWithRecipe,
+  Recipe,
+  ShoppingItemWithIngredient,
+} from "@/lib/types";
 import { DayCard } from "@/app/plan/DayCard";
+import {
+  StaplesSection,
+  type StapleView,
+} from "@/app/shopping/StaplesSection";
 
 type RecipeOption = Pick<
   Recipe,
@@ -16,6 +25,9 @@ type RecipeOption = Pick<
 export function PlanTab({ data }: { data: BootstrapData }) {
   const weekStartsOn = data.settings.week_starts_on as 0 | 1;
   const ingredients = data.ingredients as Ingredient[];
+  const shoppingItems = data.shoppingItems as ShoppingItemWithIngredient[];
+  const categoryMeta = data.categoryMeta;
+  const latestPurchases = data.latestPurchases;
   const todayWeekStart = useMemo(
     () => startOfWeek(new Date(), { weekStartsOn }),
     [weekStartsOn],
@@ -36,6 +48,53 @@ export function PlanTab({ data }: { data: BootstrapData }) {
 
   const mealByDate = new Map<string, MealPlanWithRecipe>();
   for (const m of meals) mealByDate.set(m.date, m);
+
+  // Group shopping items by contributing meal_plan_id so each day card can
+  // render its own ingredient list with the same state-picker + bought-check
+  // controls as the shopping list.
+  const itemsByMealId = useMemo(() => {
+    const map = new Map<string, ShoppingItemWithIngredient[]>();
+    for (const item of shoppingItems) {
+      for (const source of item.shopping_item_sources) {
+        if (!source.meal_plan_id) continue;
+        const list = map.get(source.meal_plan_id) ?? [];
+        if (!list.find((i) => i.id === item.id)) list.push(item);
+        map.set(source.meal_plan_id, list);
+      }
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => {
+        const an = a.ingredients?.name ?? a.name ?? "";
+        const bn = b.ingredients?.name ?? b.name ?? "";
+        return an.localeCompare(bn);
+      });
+    }
+    return map;
+  }, [shoppingItems]);
+
+  // Build staple views here (staples now live on the plan tab) and keep the
+  // existing StaplesSection unchanged.
+  const staples: StapleView[] = useMemo(() => {
+    const stapleRowByIngredient = new Map<string, ShoppingItemWithIngredient>();
+    for (const item of shoppingItems) {
+      if (item.source === "staple" && item.ingredient_id) {
+        stapleRowByIngredient.set(item.ingredient_id, item);
+      }
+    }
+    const lastPurchasedByIngredient = new Map<string, string>();
+    for (const p of latestPurchases) {
+      lastPurchasedByIngredient.set(p.ingredient_id, p.purchased_at);
+    }
+    return ingredients
+      .filter((i) => i.is_staple)
+      .map((i) => ({
+        ingredient_id: i.id,
+        name: i.name,
+        group_name: i.group_name,
+        state: stapleRowByIngredient.get(i.id)?.state ?? "not_checked",
+        last_purchased_at: lastPurchasedByIngredient.get(i.id) ?? null,
+      }));
+  }, [ingredients, shoppingItems, latestPurchases]);
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const prevWeek = format(addDays(weekStart, -7), "yyyy-MM-dd");
@@ -83,17 +142,25 @@ export function PlanTab({ data }: { data: BootstrapData }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
-          {days.map((d) => (
-            <DayCard
-              key={format(d, "yyyy-MM-dd")}
-              date={d}
-              meal={mealByDate.get(format(d, "yyyy-MM-dd")) ?? null}
-              recipes={recipes}
-              ingredients={ingredients}
-            />
-          ))}
+          {days.map((d) => {
+            const dateIso = format(d, "yyyy-MM-dd");
+            const dayMeal = mealByDate.get(dateIso) ?? null;
+            const mealItems = dayMeal ? itemsByMealId.get(dayMeal.id) ?? [] : [];
+            return (
+              <DayCard
+                key={dateIso}
+                date={d}
+                meal={dayMeal}
+                recipes={recipes}
+                ingredients={ingredients}
+                mealItems={mealItems}
+              />
+            );
+          })}
         </div>
       )}
+
+      <StaplesSection staples={staples} categoryMeta={categoryMeta} />
     </div>
   );
 }

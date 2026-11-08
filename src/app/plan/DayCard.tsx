@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
-import { PencilLine, Plus, X } from "lucide-react";
+import { ChevronDown, PencilLine, Plus, X } from "lucide-react";
 import { format, isToday, isPast } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import type {
   Ingredient,
-  MealPlanCustomIngredientWithLink,
   MealPlanWithRecipe,
   Recipe,
+  ShoppingItemWithIngredient,
 } from "@/lib/types";
 import {
   BOOTSTRAP_KEY,
@@ -24,6 +24,7 @@ import {
 } from "./actions";
 import { RecipeModal } from "./RecipeModal";
 import { CustomMealModal } from "./CustomMealModal";
+import { MealIngredientRow } from "./MealIngredientRow";
 
 type RecipeOption = Pick<
   Recipe,
@@ -35,14 +36,19 @@ export function DayCard({
   meal,
   recipes,
   ingredients,
+  mealItems,
 }: {
   date: Date;
   meal: MealPlanWithRecipe | null;
   recipes: RecipeOption[];
   ingredients: Ingredient[];
+  // Shopping items contributed to by this meal (via shopping_item_sources).
+  // Used to render the per-meal ingredient list with state pickers.
+  mealItems: ShoppingItemWithIngredient[];
 }) {
   const [picking, setPicking] = useState(false);
   const [editingCustom, setEditingCustom] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [mealLocal, setMealLocal] = useState<MealPlanWithRecipe | null>(meal);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -304,13 +310,50 @@ export function DayCard({
           </button>
         )}
 
-        {mealLocal && mealLocal.recipes && (
-          <Link
-            href={`/recipes/${mealLocal.recipes.id}`}
-            className="text-xs text-[var(--muted)] hover:text-[var(--accent)] self-start"
-          >
-            View recipe →
-          </Link>
+        {mealLocal && (
+          <div className="flex items-center justify-between gap-2">
+            {mealLocal.recipes ? (
+              <Link
+                href={`/recipes/${mealLocal.recipes.id}`}
+                className="text-xs text-[var(--muted)] hover:text-[var(--accent)]"
+              >
+                View recipe →
+              </Link>
+            ) : (
+              <span />
+            )}
+            {mealItems.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setExpanded((e) => !e)}
+                aria-expanded={expanded}
+                title={expanded ? "Hide ingredients" : "Show ingredients"}
+                className="inline-flex items-center gap-1 text-xs text-[var(--muted)] hover:text-[var(--accent)]"
+              >
+                {mealItems.length} ingredient{mealItems.length === 1 ? "" : "s"}
+                <ChevronDown
+                  size={12}
+                  className={"transition-transform " + (expanded ? "rotate-180" : "")}
+                />
+              </button>
+            )}
+          </div>
+        )}
+        {expanded && mealItems.length > 0 && mealLocal && (
+          <ul className="border-t border-[var(--border)]/60 pt-2 space-y-0.5">
+            {mealItems.map((item) => {
+              const source = item.shopping_item_sources.find(
+                (s) => s.meal_plan_id === mealLocal.id,
+              );
+              return (
+                <MealIngredientRow
+                  key={item.id}
+                  item={item}
+                  displayQuantity={source?.quantity ?? null}
+                />
+              );
+            })}
+          </ul>
         )}
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>

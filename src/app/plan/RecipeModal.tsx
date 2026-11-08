@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Clock, Search, Users, Utensils, X } from "lucide-react";
+import { Clock, PencilLine, Search, Users, Utensils, X } from "lucide-react";
 import type { Recipe } from "@/lib/types";
 
 type RecipeOption = Pick<
@@ -14,12 +14,14 @@ export function RecipeModal({
   recipes,
   selectedId,
   onPick,
+  onCustom,
   onClose,
 }: {
   open: boolean;
   recipes: RecipeOption[];
   selectedId: string | null;
   onPick: (id: string) => void;
+  onCustom?: () => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -81,12 +83,32 @@ export function RecipeModal({
         </div>
 
         <div className="flex-1 overflow-auto p-4">
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && !onCustom ? (
             <div className="text-center py-12 text-[var(--muted)]">
               No recipes match &ldquo;{query}&rdquo;
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {onCustom && (
+                <button
+                  key="__custom"
+                  type="button"
+                  onClick={onCustom}
+                  className="group rounded-2xl border border-dashed border-[var(--border)] overflow-hidden text-left transition-all bg-[var(--surface)] hover:border-[var(--accent)] hover:shadow-md"
+                >
+                  <div className="h-24 bg-[var(--accent-soft)]/50 flex items-center justify-center">
+                    <PencilLine className="text-[var(--accent)]/70" size={24} />
+                  </div>
+                  <div className="p-3">
+                    <h3 className="font-serif text-base text-[var(--accent)] group-hover:text-[var(--accent-hover)] line-clamp-1">
+                      Custom meal
+                    </h3>
+                    <div className="text-xs text-[var(--muted)] mt-1">
+                      One-off title + ingredients
+                    </div>
+                  </div>
+                </button>
+              )}
               {filtered.map((r) => {
                 const isSelected = r.id === selectedId;
                 const totalTime =

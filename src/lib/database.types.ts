@@ -2,6 +2,7 @@ import type {
   AppSettings,
   CategoryMetaRow,
   Ingredient,
+  MealPlanCustomIngredient,
   MealPlanEntry,
   PurchaseHistoryRow,
   Recipe,
@@ -80,17 +81,37 @@ export type Database = {
         Insert: {
           id?: string;
           date: string;
-          recipe_id: string;
+          recipe_id?: string | null;
+          custom_name?: string | null;
           servings?: number | null;
           slot?: string | null;
           shopped_at?: string | null;
         };
         Update: {
           date?: string;
-          recipe_id?: string;
+          recipe_id?: string | null;
+          custom_name?: string | null;
           servings?: number | null;
           slot?: string | null;
           shopped_at?: string | null;
+        };
+        Relationships: [];
+      };
+      meal_plan_custom_ingredients: {
+        Row: MealPlanCustomIngredient;
+        Insert: {
+          id?: string;
+          meal_plan_id: string;
+          ingredient_id?: string | null;
+          name?: string | null;
+          quantity?: string | null;
+          sort_order?: number;
+        };
+        Update: {
+          ingredient_id?: string | null;
+          name?: string | null;
+          quantity?: string | null;
+          sort_order?: number;
         };
         Relationships: [];
       };

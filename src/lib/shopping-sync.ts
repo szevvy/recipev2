@@ -28,7 +28,9 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
     supabase
       .from("meal_plan")
       .select(
-        "id, date, servings, shopped_at, recipes(id, default_servings, recipe_ingredients(ingredient_id, quantity))",
+        "id, date, servings, shopped_at, " +
+          "recipes(id, default_servings, recipe_ingredients(ingredient_id, quantity)), " +
+          "meal_plan_custom_ingredients(ingredient_id, quantity)",
       )
       .gte("date", today)
       .is("shopped_at", null),
@@ -36,6 +38,7 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
       .from("shopping_items")
       .select("id, ingredient_id, quantity, state, unit_key")
       .eq("source", "meal")
+      .not("ingredient_id", "is", null)
       .in("state", ["not_checked", "to_buy"]),
     supabase
       .from("shopping_items")
@@ -57,33 +60,53 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
       default_servings: number;
       recipe_ingredients: { ingredient_id: string; quantity: string | null }[];
     } | null;
+    meal_plan_custom_ingredients: {
+      ingredient_id: string | null;
+      quantity: string | null;
+    }[];
   }>;
 
   // Build merge inputs + per (ingredient_id, unit_key) contribution list.
+  // Custom meals participate too: library-backed custom ingredients flow
+  // through here (factor 1, no serving-scaling since customs have no
+  // default_servings); free-text rows are owned by setCustomMealAction.
   type Contribution = { meal_plan_id: string; quantity: string | null };
   const contributionsByBucket = new Map<string, Contribution[]>();
   const mergeInputs: MergeInput[] = [];
+  function addMealIngredient(
+    mealId: string,
+    ingredientId: string,
+    quantity: string | null,
+    factor: number,
+  ) {
+    mergeInputs.push({
+      ingredient_id: ingredientId,
+      quantity,
+      servings_factor: factor,
+    });
+    const parsed = parseQuantity(quantity);
+    const scaled = scaleQuantity(parsed, factor);
+    const scaledText =
+      scaled.qty != null
+        ? formatQuantity(scaled.qty, scaled.unit) || null
+        : scaled.raw || null;
+    const bucketKey = `${ingredientId}|${scaled.unit ?? ""}`;
+    const list = contributionsByBucket.get(bucketKey) ?? [];
+    list.push({ meal_plan_id: mealId, quantity: scaledText });
+    contributionsByBucket.set(bucketKey, list);
+  }
   for (const meal of meals) {
-    if (!meal.recipes) continue;
-    const servings = meal.servings ?? meal.recipes.default_servings;
-    const factor = servings / meal.recipes.default_servings;
-    for (const ri of meal.recipes.recipe_ingredients) {
-      mergeInputs.push({
-        ingredient_id: ri.ingredient_id,
-        quantity: ri.quantity,
-        servings_factor: factor,
-      });
-
-      const parsed = parseQuantity(ri.quantity);
-      const scaled = scaleQuantity(parsed, factor);
-      const scaledText =
-        scaled.qty != null
-          ? formatQuantity(scaled.qty, scaled.unit) || null
-          : scaled.raw || null;
-      const bucketKey = `${ri.ingredient_id}|${scaled.unit ?? ""}`;
-      const list = contributionsByBucket.get(bucketKey) ?? [];
-      list.push({ meal_plan_id: meal.id, quantity: scaledText });
-      contributionsByBucket.set(bucketKey, list);
+    if (meal.recipes) {
+      const servings = meal.servings ?? meal.recipes.default_servings;
+      const factor = servings / meal.recipes.default_servings;
+      for (const ri of meal.recipes.recipe_ingredients) {
+        addMealIngredient(meal.id, ri.ingredient_id, ri.quantity, factor);
+      }
+    } else {
+      for (const ci of meal.meal_plan_custom_ingredients ?? []) {
+        if (!ci.ingredient_id) continue;
+        addMealIngredient(meal.id, ci.ingredient_id, ci.quantity, 1);
+      }
     }
   }
   const mergedMeal = mergeShoppingItems(mergeInputs);

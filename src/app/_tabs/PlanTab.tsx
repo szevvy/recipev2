@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { addDays, format, parseISO, startOfWeek } from "date-fns";
 import type { BootstrapData } from "@/lib/queries";
 import { usePlanWeek } from "@/lib/queries";
-import type { MealPlanWithRecipe, Recipe } from "@/lib/types";
+import type { Ingredient, MealPlanWithRecipe, Recipe } from "@/lib/types";
 import { DayCard } from "@/app/plan/DayCard";
 
 type RecipeOption = Pick<
@@ -15,6 +15,7 @@ type RecipeOption = Pick<
 
 export function PlanTab({ data }: { data: BootstrapData }) {
   const weekStartsOn = data.settings.week_starts_on as 0 | 1;
+  const ingredients = data.ingredients as Ingredient[];
   const todayWeekStart = useMemo(
     () => startOfWeek(new Date(), { weekStartsOn }),
     [weekStartsOn],
@@ -88,6 +89,7 @@ export function PlanTab({ data }: { data: BootstrapData }) {
               date={d}
               meal={mealByDate.get(format(d, "yyyy-MM-dd")) ?? null}
               recipes={recipes}
+              ingredients={ingredients}
             />
           ))}
         </div>

@@ -2,17 +2,28 @@
 
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
-import { Plus, X } from "lucide-react";
+import { PencilLine, Plus, X } from "lucide-react";
 import { format, isToday, isPast } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
-import type { MealPlanWithRecipe, Recipe } from "@/lib/types";
+import type {
+  Ingredient,
+  MealPlanCustomIngredientWithLink,
+  MealPlanWithRecipe,
+  Recipe,
+} from "@/lib/types";
 import {
   BOOTSTRAP_KEY,
   useInvalidateBootstrap,
   type BootstrapData,
 } from "@/lib/queries";
-import { clearMealAction, setMealAction } from "./actions";
+import {
+  clearMealAction,
+  setCustomMealAction,
+  setMealAction,
+  type CustomMealIngredientInput,
+} from "./actions";
 import { RecipeModal } from "./RecipeModal";
+import { CustomMealModal } from "./CustomMealModal";
 
 type RecipeOption = Pick<
   Recipe,
@@ -23,12 +34,15 @@ export function DayCard({
   date,
   meal,
   recipes,
+  ingredients,
 }: {
   date: Date;
   meal: MealPlanWithRecipe | null;
   recipes: RecipeOption[];
+  ingredients: Ingredient[];
 }) {
   const [picking, setPicking] = useState(false);
+  const [editingCustom, setEditingCustom] = useState(false);
   const [mealLocal, setMealLocal] = useState<MealPlanWithRecipe | null>(meal);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +51,7 @@ export function DayCard({
   const dateIso = format(date, "yyyy-MM-dd");
   const today = isToday(date);
   const past = !today && isPast(date);
+  const isCustom = !!mealLocal && !mealLocal.recipes && !!mealLocal.custom_name;
 
   useEffect(() => {
     setMealLocal(meal);
@@ -66,9 +81,10 @@ export function DayCard({
     if (!recipe) return;
     const previous = mealLocal;
 
-    // If replacing an existing meal, ask whether to also remove its ingredients
-    // from the shopping list. Only prompt when there's actually an old recipe
-    // and we're changing to something different.
+    // If replacing an existing meal with a *different* recipe, offer to also
+    // remove its ingredients from the shopping list. Custom → recipe swap
+    // doesn't prompt — its library items will re-sync and free-text items
+    // get cleared server-side anyway.
     let removeOldIngredients = false;
     if (
       previous &&
@@ -85,6 +101,7 @@ export function DayCard({
       id: previous?.id ?? `temp-${Date.now()}`,
       date: dateIso,
       recipe_id: recipeId,
+      custom_name: null,
       servings: previous?.servings ?? null,
       slot: null,
       shopped_at: null,
@@ -95,6 +112,7 @@ export function DayCard({
         default_servings: recipe.default_servings,
         image_url: recipe.image_url,
       },
+      meal_plan_custom_ingredients: [],
     };
     setMealLocal(optimistic);
     patchMealCaches(optimistic);
@@ -109,19 +127,74 @@ export function DayCard({
         return;
       }
       // Shopping list items change server-side (sync + orphan cleanup), so
-      // refresh bootstrap when we touched the shopping side too.
-      if (removeOldIngredients) invalidate();
+      // refresh bootstrap when we touched the shopping side too. Also when
+      // the old meal was a custom one, since its free-text shopping items
+      // were cleared.
+      if (removeOldIngredients || (previous && !previous.recipes)) invalidate();
     });
+  }
+
+  async function saveCustom(
+    name: string,
+    rows: CustomMealIngredientInput[],
+  ): Promise<void> {
+    const previous = mealLocal;
+    // Optimistic: build a local meal-with-custom-ingredients view.
+    const optimistic: MealPlanWithRecipe = {
+      id: previous?.id ?? `temp-${Date.now()}`,
+      date: dateIso,
+      recipe_id: null,
+      custom_name: name,
+      servings: null,
+      slot: null,
+      shopped_at: null,
+      created_at: previous?.created_at ?? new Date().toISOString(),
+      recipes: null,
+      meal_plan_custom_ingredients: rows.map((r, idx) => {
+        const linked = r.ingredient_id
+          ? ingredients.find((i) => i.id === r.ingredient_id) ?? null
+          : null;
+        return {
+          id: typeof crypto !== "undefined" ? crypto.randomUUID() : String(idx),
+          meal_plan_id: previous?.id ?? "",
+          ingredient_id: r.ingredient_id,
+          name: r.name,
+          quantity: r.quantity,
+          sort_order: idx,
+          ingredients: linked
+            ? { id: linked.id, name: linked.name, group_name: linked.group_name }
+            : null,
+        };
+      }),
+    };
+    setMealLocal(optimistic);
+    patchMealCaches(optimistic);
+    setEditingCustom(false);
+    setError(null);
+    const result = await setCustomMealAction(dateIso, name, rows);
+    if (!result.ok) {
+      setMealLocal(previous);
+      patchMealCaches(previous);
+      setError(result.error);
+      // Surface error inside modal by re-opening.
+      setEditingCustom(true);
+      throw new Error(result.error);
+    }
+    // Shopping items were just added server-side — refresh bootstrap so the
+    // list picks them up.
+    invalidate();
   }
 
   function clear() {
     const previous = mealLocal;
     if (!previous) return;
 
+    const label =
+      previous.recipes?.name ?? previous.custom_name ?? "this meal";
     const removeIngredients =
       typeof window !== "undefined"
         ? window.confirm(
-            `Remove "${previous.recipes?.name ?? "this meal"}". Also remove its ingredients from the shopping list?`,
+            `Remove "${label}". Also remove its ingredients from the shopping list?`,
           )
         : false;
 
@@ -136,8 +209,18 @@ export function DayCard({
         setError(result.error);
         return;
       }
-      if (removeIngredients) invalidate();
+      // Custom meals' free-text items were cascaded away by the delete, so
+      // refresh bootstrap regardless of the user's "remove ingredients" pick.
+      if (removeIngredients || !previous.recipes) invalidate();
     });
+  }
+
+  function openMealAction() {
+    if (isCustom) {
+      setEditingCustom(true);
+    } else {
+      setPicking(true);
+    }
   }
 
   return (
@@ -178,7 +261,7 @@ export function DayCard({
         {mealLocal ? (
           mealLocal.recipes?.image_url ? (
             <button
-              onClick={() => setPicking(true)}
+              onClick={openMealAction}
               className="group flex-1 text-left -mx-2 -mb-2 min-h-[7rem] rounded-xl overflow-hidden relative bg-cover bg-center transition-transform hover:scale-[1.01]"
               style={{ backgroundImage: `url(${mealLocal.recipes.image_url})` }}
             >
@@ -189,9 +272,22 @@ export function DayCard({
                 </div>
               </div>
             </button>
+          ) : isCustom ? (
+            <button
+              onClick={openMealAction}
+              className="group flex-1 text-left -mx-2 -mb-2 px-2 pb-2 rounded-xl hover:bg-[var(--accent-soft)] transition-colors"
+            >
+              <div className="font-medium text-[var(--foreground)] group-hover:text-[var(--accent)] truncate flex items-center gap-1">
+                <PencilLine size={12} className="text-[var(--accent)] shrink-0" />
+                <span className="truncate">{mealLocal.custom_name}</span>
+              </div>
+              <div className="text-[10px] italic text-[var(--muted)] mt-0.5">
+                custom meal
+              </div>
+            </button>
           ) : (
             <button
-              onClick={() => setPicking(true)}
+              onClick={openMealAction}
               className="group flex-1 text-left -mx-2 -mb-2 px-2 pb-2 rounded-xl hover:bg-[var(--accent-soft)] transition-colors"
             >
               <div className="font-medium text-[var(--foreground)] group-hover:text-[var(--accent)] truncate">
@@ -224,7 +320,20 @@ export function DayCard({
         recipes={recipes}
         selectedId={mealLocal?.recipe_id ?? null}
         onPick={assign}
+        onCustom={() => {
+          setPicking(false);
+          setEditingCustom(true);
+        }}
         onClose={() => setPicking(false)}
+      />
+
+      <CustomMealModal
+        open={editingCustom}
+        ingredients={ingredients}
+        initialName={isCustom ? mealLocal?.custom_name ?? "" : ""}
+        initialIngredients={isCustom ? mealLocal?.meal_plan_custom_ingredients ?? [] : []}
+        onSave={saveCustom}
+        onClose={() => setEditingCustom(false)}
       />
     </>
   );

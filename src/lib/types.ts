@@ -36,15 +36,30 @@ export type RecipeIngredient = {
 export type MealPlanEntry = {
   id: string;
   date: string;
-  recipe_id: string;
+  recipe_id: string | null;
+  custom_name: string | null;
   servings: number | null;
   slot: string | null;
   shopped_at: string | null;
   created_at: string;
 };
 
+export type MealPlanCustomIngredient = {
+  id: string;
+  meal_plan_id: string;
+  ingredient_id: string | null;
+  name: string | null;
+  quantity: string | null;
+  sort_order: number;
+};
+
+export type MealPlanCustomIngredientWithLink = MealPlanCustomIngredient & {
+  ingredients: Pick<Ingredient, "id" | "name" | "group_name"> | null;
+};
+
 export type MealPlanWithRecipe = MealPlanEntry & {
   recipes: Pick<Recipe, "id" | "name" | "default_servings" | "image_url"> | null;
+  meal_plan_custom_ingredients: MealPlanCustomIngredientWithLink[];
 };
 
 export type ShoppingItemSource = "meal" | "staple" | "manual";

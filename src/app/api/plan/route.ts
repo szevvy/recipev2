@@ -17,7 +17,10 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseAdmin()
     .from("meal_plan")
-    .select("*, recipes(id, name, default_servings, image_url)")
+    .select(
+      "*, recipes(id, name, default_servings, image_url), " +
+        "meal_plan_custom_ingredients(id, meal_plan_id, ingredient_id, name, quantity, sort_order, ingredients(id, name, group_name))",
+    )
     .gte("date", week)
     .lte("date", weekEndIso)
     .is("slot", null);

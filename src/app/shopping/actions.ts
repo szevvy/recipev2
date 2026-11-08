@@ -172,10 +172,13 @@ export async function addOneOffItemAction(
 
 // Finish shopping:
 //   1. Record every bought item in purchase_history (one row per bought item).
-//   2. Delete bought AND have rows (purchased or consumed this trip).
-//   3. Reset remaining staple rows to 'not_checked' so next trip starts fresh
-//      (meal/manual rows keep their state — forgotten items persist).
-//   4. Stamp current (unshopped) meal_plan entries so sync won't re-add their items.
+//   2. Flip bought -> have on meal/manual rows so they persist as pantry stock
+//      (linked back to their contributing meals via shopping_item_sources).
+//      Delete bought staple rows — staples have their own reset step below.
+//   3. Reset remaining staple rows to 'not_checked' so next trip starts fresh.
+//   4. Stamp current (unshopped) meal_plan entries so sync won't re-add items
+//      for them; the pantry row (state='have') is what ties the meal to its
+//      ingredients afterwards.
 export async function finishShoppingAction(): Promise<ActionResult> {
   const supabase = supabaseAdmin();
   const today = new Date().toISOString().slice(0, 10);
@@ -203,12 +206,23 @@ export async function finishShoppingAction(): Promise<ActionResult> {
     if (histErr) return { ok: false, error: histErr.message };
   }
 
-  const { error: delErr } = await supabase
+  // bought meal/manual rows -> have (pantry). Staple bought rows are dropped
+  // here and re-created fresh on next pre-shop review.
+  const { error: stapleBoughtDelErr } = await supabase
     .from("shopping_items")
     .delete()
-    .in("state", ["bought", "have"]);
-  if (delErr) return { ok: false, error: delErr.message };
+    .eq("state", "bought")
+    .eq("source", "staple");
+  if (stapleBoughtDelErr) return { ok: false, error: stapleBoughtDelErr.message };
 
+  const { error: pantryErr } = await supabase
+    .from("shopping_items")
+    .update({ state: "have" })
+    .eq("state", "bought");
+  if (pantryErr) return { ok: false, error: pantryErr.message };
+
+  // Staples: reset any non-not_checked (incl. have) back to not_checked so
+  // next week's review starts fresh.
   const { error: resetErr } = await supabase
     .from("shopping_items")
     .update({ state: "not_checked" })

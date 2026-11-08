@@ -16,15 +16,21 @@ export function FinishShoppingButton() {
   const qc = useQueryClient();
 
   function onClick() {
-    if (!confirm("Finish shopping? This clears bought items and resets staples.")) return;
+    if (
+      !confirm(
+        "Finish shopping? Bought items move into your pantry (Already have), and staples reset for next week.",
+      )
+    )
+      return;
 
     const snapshot = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
     const nowIso = new Date().toISOString();
 
-    // Mirror the server's finish steps on the cache so the list clears
-    // immediately: drop bought+have rows, reset remaining staples to
-    // not_checked, stamp current meals as shopped so sync won't re-add them,
-    // and roll forward latestPurchases so "last bought" badges refresh.
+    // Mirror the server's finish steps on the cache so the list updates
+    // immediately: bought meal/manual rows become 'have' (pantry), bought
+    // staples drop, every remaining staple resets to not_checked, current
+    // meals get a shopped_at stamp, and latestPurchases rolls forward so
+    // 'last bought' badges refresh.
     qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
       if (!old) return old;
       const boughtIngredientIds = new Set(
@@ -33,8 +39,18 @@ export function FinishShoppingButton() {
           .map((i) => i.ingredient_id as string),
       );
       const shoppingItems = old.shoppingItems
-        .filter((i) => i.state !== "bought" && i.state !== "have")
-        .map((i) => (i.source === "staple" ? { ...i, state: "not_checked" as const } : i));
+        .filter((i) => !(i.state === "bought" && i.source === "staple"))
+        .map((i) => {
+          if (i.state === "bought" && i.source !== "staple") {
+            return { ...i, state: "have" as const };
+          }
+          return i;
+        })
+        .map((i) =>
+          i.source === "staple" && i.state !== "not_checked"
+            ? { ...i, state: "not_checked" as const }
+            : i,
+        );
       const meals = old.meals.map((m) =>
         m.shopped_at ? m : { ...m, shopped_at: nowIso },
       );

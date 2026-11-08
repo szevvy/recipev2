@@ -141,7 +141,7 @@ export function PlanTab({ data }: { data: BootstrapData }) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
+        <div className="flex flex-col gap-3">
           {days.map((d) => {
             const dateIso = format(d, "yyyy-MM-dd");
             const dayMeal = mealByDate.get(dateIso) ?? null;

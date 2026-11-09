@@ -2,6 +2,7 @@ import type {
   AppSettings,
   CategoryMetaRow,
   Ingredient,
+  IngredientListMembership,
   MealPlanCustomIngredient,
   MealPlanEntry,
   PurchaseHistoryRow,
@@ -16,15 +17,19 @@ import type {
   WeekStart,
 } from "./types";
 
+// Row shape as stored in Postgres — the `lists` field on the client-side
+// Ingredient type is populated by the bootstrap API from the memberships
+// table and is not a column here.
+type IngredientRow = Omit<Ingredient, "lists">;
+
 type IngredientInsert = {
   id?: string;
   name: string;
   group_name?: string | null;
-  is_staple?: boolean;
   staple_state?: StapleState;
 };
 
-type IngredientUpdate = Partial<Omit<Ingredient, "id" | "created_at" | "updated_at">>;
+type IngredientUpdate = Partial<Omit<IngredientRow, "id" | "created_at" | "updated_at">>;
 
 type RecipeInsert = {
   id?: string;
@@ -53,9 +58,18 @@ export type Database = {
   public: {
     Tables: {
       ingredients: {
-        Row: Ingredient;
+        Row: IngredientRow;
         Insert: IngredientInsert;
         Update: IngredientUpdate;
+        Relationships: [];
+      };
+      ingredient_list_memberships: {
+        Row: IngredientListMembership;
+        Insert: {
+          ingredient_id: string;
+          list_name: string;
+        };
+        Update: { list_name?: string };
         Relationships: [];
       };
       recipes: {

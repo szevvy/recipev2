@@ -14,10 +14,10 @@ import type {
   ShoppingItemState,
   ShoppingItemWithIngredient,
 } from "@/lib/types";
-import { setStapleStateAction } from "./actions";
-import { StatePicker } from "./StatePicker";
+import { setStapleStateAction } from "@/app/shopping/actions";
+import { StatePicker } from "@/app/shopping/StatePicker";
 
-export type StapleView = {
+export type ListMemberView = {
   ingredient_id: string;
   name: string;
   group_name: string | null;
@@ -44,28 +44,35 @@ function formatLastPurchased(iso: string): string {
 
 const UNGROUPED = "__ungrouped__";
 
-export function StaplesSection({
-  staples,
+// One collapsible card per user-defined ingredient list (Staples, Dessert,
+// Camping, etc.). Members render grouped by shopping category with a shared
+// state picker — toggling to_buy/have creates the backing shopping_items row.
+export function ListSection({
+  listName,
+  members,
   categoryMeta,
+  defaultOpen = false,
 }: {
-  staples: StapleView[];
+  listName: string;
+  members: ListMemberView[];
   categoryMeta: CategoryMetaRow[];
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  if (staples.length === 0) return null;
+  const [open, setOpen] = useState(defaultOpen);
+  if (members.length === 0) return null;
 
-  const notReviewed = staples.filter((s) => s.state === "not_checked").length;
-  const toBuy = staples.filter((s) => s.state === "to_buy").length;
-  const have = staples.filter((s) => s.state === "have").length;
+  const notReviewed = members.filter((m) => m.state === "not_checked").length;
+  const toBuy = members.filter((m) => m.state === "to_buy").length;
+  const have = members.filter((m) => m.state === "have").length;
 
   const metaByName = new Map<string, CategoryMetaRow>();
   for (const m of categoryMeta) metaByName.set(m.name, m);
 
-  const byGroup = new Map<string, StapleView[]>();
-  for (const s of staples) {
-    const key = s.group_name ?? UNGROUPED;
+  const byGroup = new Map<string, ListMemberView[]>();
+  for (const m of members) {
+    const key = m.group_name ?? UNGROUPED;
     const bucket = byGroup.get(key) ?? [];
-    bucket.push(s);
+    bucket.push(m);
     byGroup.set(key, bucket);
   }
   for (const bucket of byGroup.values()) {
@@ -94,7 +101,9 @@ export function StaplesSection({
         <div className="flex items-baseline gap-3 min-w-0">
           <div className="flex items-center gap-2">
             <Sparkles size={16} className="text-[var(--accent)]" />
-            <span className="font-serif text-base text-[var(--foreground)]">Staples</span>
+            <span className="font-serif text-base text-[var(--foreground)]">
+              {listName}
+            </span>
           </div>
           <span className="text-xs text-[var(--muted)] truncate">
             {notReviewed > 0 && (
@@ -148,7 +157,7 @@ export function StaplesSection({
                   style={ulStyle}
                 >
                   {bucket.map((item) => (
-                    <StapleRow
+                    <ListMemberRow
                       key={item.ingredient_id}
                       item={item}
                       chipText={color?.chipText ?? null}
@@ -164,11 +173,11 @@ export function StaplesSection({
   );
 }
 
-function StapleRow({
+function ListMemberRow({
   item,
   chipText,
 }: {
-  item: StapleView;
+  item: ListMemberView;
   chipText: string | null;
 }) {
   const [state, setState] = useState<ShoppingItemState>(item.state);
@@ -182,8 +191,8 @@ function StapleRow({
   }, [item.state]);
 
   function patchCache(next: ShoppingItemState, rowId: string) {
-    // Mirror the server's insert/update/delete on the bootstrap cache so the
-    // staples summary + ShoppingList re-derive instantly without a refetch.
+    // Mirror the server's insert/update/delete on the bootstrap cache so
+    // every list + the shopping list re-derive instantly without a refetch.
     qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
       if (!old) return old;
       const existing = old.shoppingItems.find(

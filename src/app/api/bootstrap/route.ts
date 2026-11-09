@@ -29,11 +29,12 @@ export async function GET() {
     mealsResp,
     categoryMetaResp,
     latestPurchasesResp,
+    listMembershipsResp,
   ] = await Promise.all([
     supabase
       .from("shopping_items")
       .select(
-        "*, ingredients(id, name, group_name, is_staple), shopping_item_sources(id, kind, quantity, meal_plan_id, meal_plan(date, recipes(id, name)))",
+        "*, ingredients(id, name, group_name), shopping_item_sources(id, kind, quantity, meal_plan_id, meal_plan(date, recipes(id, name)))",
       )
       .order("created_at"),
     supabase.from("ingredients").select("*").order("name"),
@@ -56,6 +57,9 @@ export async function GET() {
       .is("slot", null),
     supabase.from("category_meta").select("*"),
     supabase.from("latest_purchases").select("ingredient_id, purchased_at"),
+    supabase
+      .from("ingredient_list_memberships")
+      .select("ingredient_id, list_name"),
   ]);
 
   const firstErr =
@@ -64,10 +68,26 @@ export async function GET() {
     recipesResp.error ??
     mealsResp.error ??
     categoryMetaResp.error ??
-    latestPurchasesResp.error;
+    latestPurchasesResp.error ??
+    listMembershipsResp.error;
   if (firstErr) {
     return NextResponse.json({ ok: false, error: firstErr.message }, { status: 500 });
   }
+
+  // Attach list memberships to each ingredient so the client never needs a
+  // separate lookup. Each ingredient.lists is a de-duped, alpha-sorted array.
+  const listsByIngredientId = new Map<string, string[]>();
+  for (const row of listMembershipsResp.data ?? []) {
+    const list = listsByIngredientId.get(row.ingredient_id) ?? [];
+    list.push(row.list_name);
+    listsByIngredientId.set(row.ingredient_id, list);
+  }
+  const ingredients = (ingredientsResp.data ?? []).map((i) => ({
+    ...i,
+    lists: (listsByIngredientId.get(i.id) ?? []).slice().sort((a, b) =>
+      a.localeCompare(b),
+    ),
+  }));
 
   return NextResponse.json({
     ok: true,
@@ -75,7 +95,7 @@ export async function GET() {
       settings,
       weekStart: weekStartIso,
       shoppingItems: shoppingResp.data ?? [],
-      ingredients: ingredientsResp.data ?? [],
+      ingredients,
       recipes: recipesResp.data ?? [],
       meals: mealsResp.data ?? [],
       categoryMeta: categoryMetaResp.data ?? [],

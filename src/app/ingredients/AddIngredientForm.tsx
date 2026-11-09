@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { StarToggleHidden } from "@/components/StarButton";
+import { ListPicker } from "@/components/ListPicker";
 import { GroupCombobox } from "@/components/GroupCombobox";
 import {
   BOOTSTRAP_KEY,
@@ -13,8 +13,14 @@ import {
 import type { Ingredient } from "@/lib/types";
 import { createIngredientAction } from "./actions";
 
-export function AddIngredientForm({ groupSuggestions }: { groupSuggestions: string[] }) {
-  const [isStaple, setIsStaple] = useState(false);
+export function AddIngredientForm({
+  groupSuggestions,
+  knownLists,
+}: {
+  groupSuggestions: string[];
+  knownLists: string[];
+}) {
+  const [lists, setLists] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
@@ -39,7 +45,7 @@ export function AddIngredientForm({ groupSuggestions }: { groupSuggestions: stri
       id: rowId,
       name,
       group_name: groupName || null,
-      is_staple: isStaple,
+      lists: [...lists].sort((a, b) => a.localeCompare(b)),
       staple_state: "not_checked",
       created_at: nowIso,
       updated_at: nowIso,
@@ -55,7 +61,7 @@ export function AddIngredientForm({ groupSuggestions }: { groupSuggestions: stri
     });
 
     form.reset();
-    setIsStaple(false);
+    setLists([]);
     setError(null);
 
     startTransition(async () => {
@@ -103,10 +109,16 @@ export function AddIngredientForm({ groupSuggestions }: { groupSuggestions: stri
             />
           </div>
         </label>
-        <StarToggleHidden
-          name="is_staple"
-          checked={isStaple}
-          onChange={setIsStaple}
+        <ListPicker
+          lists={lists}
+          knownLists={knownLists}
+          onToggle={(name, nowSelected) =>
+            setLists((prev) =>
+              nowSelected
+                ? Array.from(new Set([...prev, name]))
+                : prev.filter((l) => l !== name),
+            )
+          }
           size={22}
         />
         <button
@@ -117,6 +129,9 @@ export function AddIngredientForm({ groupSuggestions }: { groupSuggestions: stri
           Add
         </button>
       </div>
+      {lists.map((l) => (
+        <input key={l} type="hidden" name="lists" value={l} />
+      ))}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </form>
   );

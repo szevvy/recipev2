@@ -4,10 +4,19 @@ export type Ingredient = {
   id: string;
   name: string;
   group_name: string | null;
-  is_staple: boolean;
+  // Populated by the bootstrap API from ingredient_list_memberships. Not a
+  // DB column on ingredients. "Staples" is the default list; users can add
+  // arbitrary lists ("Dessert", "Camping") by just typing a name.
+  lists: string[];
   staple_state: StapleState;
   created_at: string;
   updated_at: string;
+};
+
+export type IngredientListMembership = {
+  ingredient_id: string;
+  list_name: string;
+  created_at: string;
 };
 
 export type Recipe = {

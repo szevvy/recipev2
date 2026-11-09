@@ -13,10 +13,7 @@ import type {
 } from "@/lib/types";
 import { DayCard } from "@/app/plan/DayCard";
 import { buildMealIngredients } from "@/app/plan/mealIngredients";
-import {
-  StaplesSection,
-  type StapleView,
-} from "@/app/shopping/StaplesSection";
+import { ListSection, type ListMemberView } from "@/app/plan/ListSection";
 
 type RecipeOption = Pick<
   Recipe,
@@ -62,9 +59,10 @@ export function PlanTab({ data }: { data: BootstrapData }) {
     return map;
   }, [meals, shoppingItems]);
 
-  // Build staple views here (staples now live on the plan tab) and keep the
-  // existing StaplesSection unchanged.
-  const staples: StapleView[] = useMemo(() => {
+  // Pivot ingredients → per-list ListMemberView arrays. Every list named
+  // in any ingredient.lists gets its own section; Staples is special-cased
+  // to appear first (and to show even when empty if the user is bootstrapping).
+  const listSections = useMemo(() => {
     const stapleRowByIngredient = new Map<string, ShoppingItemWithIngredient>();
     for (const item of shoppingItems) {
       if (item.source === "staple" && item.ingredient_id) {
@@ -75,15 +73,28 @@ export function PlanTab({ data }: { data: BootstrapData }) {
     for (const p of latestPurchases) {
       lastPurchasedByIngredient.set(p.ingredient_id, p.purchased_at);
     }
-    return ingredients
-      .filter((i) => i.is_staple)
-      .map((i) => ({
-        ingredient_id: i.id,
-        name: i.name,
-        group_name: i.group_name,
-        state: stapleRowByIngredient.get(i.id)?.state ?? "not_checked",
-        last_purchased_at: lastPurchasedByIngredient.get(i.id) ?? null,
-      }));
+    const membersByList = new Map<string, ListMemberView[]>();
+    for (const ing of ingredients) {
+      if (ing.lists.length === 0) continue;
+      const view: ListMemberView = {
+        ingredient_id: ing.id,
+        name: ing.name,
+        group_name: ing.group_name,
+        state: stapleRowByIngredient.get(ing.id)?.state ?? "not_checked",
+        last_purchased_at: lastPurchasedByIngredient.get(ing.id) ?? null,
+      };
+      for (const listName of ing.lists) {
+        const bucket = membersByList.get(listName) ?? [];
+        bucket.push(view);
+        membersByList.set(listName, bucket);
+      }
+    }
+    const names = Array.from(membersByList.keys()).sort((a, b) => {
+      if (a === "Staples") return -1;
+      if (b === "Staples") return 1;
+      return a.localeCompare(b);
+    });
+    return names.map((name) => ({ name, members: membersByList.get(name) ?? [] }));
   }, [ingredients, shoppingItems, latestPurchases]);
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -152,7 +163,14 @@ export function PlanTab({ data }: { data: BootstrapData }) {
         </div>
       )}
 
-      <StaplesSection staples={staples} categoryMeta={categoryMeta} />
+      {listSections.map((list) => (
+        <ListSection
+          key={list.name}
+          listName={list.name}
+          members={list.members}
+          categoryMeta={categoryMeta}
+        />
+      ))}
     </div>
   );
 }

@@ -5,23 +5,32 @@ import {
   RecipeInputSchema,
 } from "./validation";
 
-function fd(entries: Record<string, string | undefined>): FormData {
+function fd(entries: Array<[string, string]> | Record<string, string | undefined>): FormData {
   const f = new FormData();
-  for (const [k, v] of Object.entries(entries)) {
-    if (v !== undefined) f.append(k, v);
+  if (Array.isArray(entries)) {
+    for (const [k, v] of entries) f.append(k, v);
+  } else {
+    for (const [k, v] of Object.entries(entries)) {
+      if (v !== undefined) f.append(k, v);
+    }
   }
   return f;
 }
 
 describe("parseIngredientForm", () => {
-  it("parses a full row", () => {
+  it("parses a full row with lists", () => {
     const result = parseIngredientForm(
-      fd({ name: "Flour", group_name: "Baking", is_staple: "on" }),
+      fd([
+        ["name", "Flour"],
+        ["group_name", "Baking"],
+        ["lists", "Staples"],
+        ["lists", "Baking essentials"],
+      ]),
     );
     expect(result).toEqual({
       name: "Flour",
       group_name: "Baking",
-      is_staple: true,
+      lists: ["Staples", "Baking essentials"],
     });
   });
 
@@ -36,9 +45,21 @@ describe("parseIngredientForm", () => {
     expect(result.group_name).toBeNull();
   });
 
-  it("defaults is_staple to false when checkbox omitted", () => {
+  it("defaults lists to [] when no entries present", () => {
     const result = parseIngredientForm(fd({ name: "Pepper" }));
-    expect(result.is_staple).toBe(false);
+    expect(result.lists).toEqual([]);
+  });
+
+  it("dedupes list names case-insensitively, preserving first casing", () => {
+    const result = parseIngredientForm(
+      fd([
+        ["name", "Flour"],
+        ["lists", "Staples"],
+        ["lists", "  staples  "],
+        ["lists", "STAPLES"],
+      ]),
+    );
+    expect(result.lists).toEqual(["Staples"]);
   });
 
   it("rejects empty name", () => {
@@ -55,7 +76,7 @@ describe("IngredientInputSchema direct", () => {
     const result = IngredientInputSchema.parse({
       name: "Eggs",
       group_name: "",
-      is_staple: false,
+      lists: [],
     });
     expect(result.group_name).toBeNull();
   });

@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Pencil, Trash2, Check, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Ingredient } from "@/lib/types";
-import { StarButton, StarToggleHidden } from "@/components/StarButton";
+import { ListPicker } from "@/components/ListPicker";
 import { GroupCombobox } from "@/components/GroupCombobox";
 import {
   BOOTSTRAP_KEY,
@@ -12,21 +12,23 @@ import {
   type BootstrapData,
 } from "@/lib/queries";
 import {
+  addIngredientToListAction,
   deleteIngredientAction,
-  toggleStapleAction,
+  removeIngredientFromListAction,
   updateIngredientAction,
 } from "./actions";
 
 export function IngredientRow({
   ingredient,
   groupSuggestions,
+  knownLists,
 }: {
   ingredient: Ingredient;
   groupSuggestions: string[];
+  knownLists: string[];
 }) {
   const [editing, setEditing] = useState(false);
-  const [editStaple, setEditStaple] = useState(ingredient.is_staple);
-  const [isStapleLocal, setIsStapleLocal] = useState(ingredient.is_staple);
+  const [editLists, setEditLists] = useState<string[]>(ingredient.lists);
   const [deletedLocal, setDeletedLocal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -34,11 +36,11 @@ export function IngredientRow({
   const qc = useQueryClient();
 
   useEffect(() => {
-    setIsStapleLocal(ingredient.is_staple);
-  }, [ingredient.is_staple]);
+    if (!editing) setEditLists(ingredient.lists);
+  }, [ingredient.lists, editing]);
 
   function openEdit() {
-    setEditStaple(ingredient.is_staple);
+    setEditLists(ingredient.lists);
     setError(null);
     setEditing(true);
   }
@@ -51,11 +53,11 @@ export function IngredientRow({
   function onSave(fd: FormData) {
     const nextName = String(fd.get("name") ?? "").trim();
     const nextGroup = String(fd.get("group_name") ?? "").trim();
-    const nextStaple = fd.get("is_staple") != null;
     if (!nextName) {
       setError("Name is required");
       return;
     }
+    const nextLists = [...editLists].sort((a, b) => a.localeCompare(b));
     const snapshot = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
     qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
       if (!old) return old;
@@ -66,7 +68,7 @@ export function IngredientRow({
                 ...i,
                 name: nextName,
                 group_name: nextGroup || null,
-                is_staple: nextStaple,
+                lists: nextLists,
                 updated_at: new Date().toISOString(),
               }
             : i,
@@ -74,7 +76,6 @@ export function IngredientRow({
         .sort((a, b) => a.name.localeCompare(b.name));
       return { ...old, ingredients: next };
     });
-    setIsStapleLocal(nextStaple);
     setEditing(false);
     setError(null);
 
@@ -83,7 +84,6 @@ export function IngredientRow({
       if (!result.ok) {
         if (snapshot) qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, snapshot);
         else invalidate();
-        setIsStapleLocal(ingredient.is_staple);
         setEditing(true);
         setError(result.error);
       }
@@ -114,32 +114,33 @@ export function IngredientRow({
     });
   }
 
-  function onToggleStaple() {
-    const next = !isStapleLocal;
-    setIsStapleLocal(next);
-    setError(null);
+  function patchListsInCache(nextLists: string[]) {
     qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
       if (!old) return old;
       return {
         ...old,
         ingredients: old.ingredients.map((i) =>
-          i.id === ingredient.id ? { ...i, is_staple: next } : i,
+          i.id === ingredient.id ? { ...i, lists: nextLists } : i,
         ),
       };
     });
+  }
+
+  function onListToggle(listName: string, nowSelected: boolean) {
+    const current = ingredient.lists;
+    if (nowSelected && current.includes(listName)) return;
+    if (!nowSelected && !current.includes(listName)) return;
+    const next = nowSelected
+      ? [...current, listName].sort((a, b) => a.localeCompare(b))
+      : current.filter((l) => l !== listName);
+    patchListsInCache(next);
+    setError(null);
     startTransition(async () => {
-      const result = await toggleStapleAction(ingredient.id, next);
+      const result = nowSelected
+        ? await addIngredientToListAction(ingredient.id, listName)
+        : await removeIngredientFromListAction(ingredient.id, listName);
       if (!result.ok) {
-        setIsStapleLocal(!next);
-        qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            ingredients: old.ingredients.map((i) =>
-              i.id === ingredient.id ? { ...i, is_staple: !next } : i,
-            ),
-          };
-        });
+        patchListsInCache(current);
         setError(result.error);
       }
     });
@@ -172,13 +173,22 @@ export function IngredientRow({
                 />
               </div>
             </label>
-            <StarToggleHidden
-              name="is_staple"
-              checked={editStaple}
-              onChange={setEditStaple}
+            <ListPicker
+              lists={editLists}
+              knownLists={knownLists}
+              onToggle={(name, nowSelected) => {
+                setEditLists((prev) =>
+                  nowSelected
+                    ? Array.from(new Set([...prev, name]))
+                    : prev.filter((l) => l !== name),
+                );
+              }}
               size={22}
             />
           </div>
+          {editLists.map((l) => (
+            <input key={l} type="hidden" name="lists" value={l} />
+          ))}
           <div className="flex gap-2 justify-end items-center">
             {error && <p className="text-xs text-red-600 mr-auto">{error}</p>}
             <button
@@ -203,7 +213,11 @@ export function IngredientRow({
 
   return (
     <li className="flex items-center gap-2 rounded-lg hover:bg-[var(--surface-muted)] px-2 py-1.5 transition-colors">
-      <StarButton active={isStapleLocal} onToggle={onToggleStaple} />
+      <ListPicker
+        lists={ingredient.lists}
+        knownLists={knownLists}
+        onToggle={onListToggle}
+      />
       <div className="flex-1 min-w-0">
         <div className="font-medium text-[var(--foreground)] truncate">{ingredient.name}</div>
       </div>

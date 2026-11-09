@@ -12,13 +12,15 @@ const UNGROUPED_LABEL = "Ungrouped";
 export function IngredientsTab({ data }: { data: BootstrapData }) {
   const ingredients = data.ingredients as Ingredient[];
 
-  const { groupKeys, byGroup, groupSuggestions } = useMemo(() => {
+  const { groupKeys, byGroup, groupSuggestions, knownLists } = useMemo(() => {
     const byGroup = new Map<string, Ingredient[]>();
+    const listSet = new Set<string>();
     for (const ing of ingredients) {
       const key = ing.group_name ?? UNGROUPED_KEY;
       const bucket = byGroup.get(key) ?? [];
       bucket.push(ing);
       byGroup.set(key, bucket);
+      for (const l of ing.lists) listSet.add(l);
     }
 
     const groupKeys = Array.from(byGroup.keys())
@@ -30,7 +32,10 @@ export function IngredientsTab({ data }: { data: BootstrapData }) {
       .filter((k) => k !== UNGROUPED_KEY)
       .sort();
 
-    return { byGroup, groupKeys, groupSuggestions };
+    const knownLists = Array.from(listSet).sort((a, b) => a.localeCompare(b));
+    if (!listSet.has("Staples")) knownLists.unshift("Staples");
+
+    return { byGroup, groupKeys, groupSuggestions, knownLists };
   }, [ingredients]);
 
   return (
@@ -38,11 +43,12 @@ export function IngredientsTab({ data }: { data: BootstrapData }) {
       <div>
         <h1 className="font-serif text-3xl text-[var(--foreground)]">Ingredients</h1>
         <p className="text-sm text-[var(--muted)] mt-1">
-          The star marks staples. Groups come from whatever you type in the Group field.
+          The star picks which lists an ingredient belongs to — Staples, or
+          any ad-hoc list you want. Groups come from the Group field.
         </p>
       </div>
 
-      <AddIngredientForm groupSuggestions={groupSuggestions} />
+      <AddIngredientForm groupSuggestions={groupSuggestions} knownLists={knownLists} />
 
       {ingredients.length === 0 ? (
         <p className="text-[var(--muted)] text-sm italic text-center py-10">
@@ -67,6 +73,7 @@ export function IngredientsTab({ data }: { data: BootstrapData }) {
                       key={ing.id}
                       ingredient={ing}
                       groupSuggestions={groupSuggestions}
+                      knownLists={knownLists}
                     />
                   ))}
                 </ul>

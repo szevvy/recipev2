@@ -120,16 +120,17 @@ const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE
 });
 
 async function upsertIngredient(name, groupName, isStaple) {
-  const insert = { name, group_name: groupName, is_staple: isStaple };
+  const insert = { name, group_name: groupName };
   const { data, error } = await supabase
     .from("ingredients")
     .insert(insert)
     .select("id")
     .single();
 
-  if (!error) return data.id;
-
-  if (error.code === "23505") {
+  let id;
+  if (!error) {
+    id = data.id;
+  } else if (error.code === "23505") {
     const { data: existing, error: lookupErr } = await supabase
       .from("ingredients")
       .select("id")
@@ -140,12 +141,24 @@ async function upsertIngredient(name, groupName, isStaple) {
     }
     const { error: updErr } = await supabase
       .from("ingredients")
-      .update({ group_name: groupName, is_staple: isStaple })
+      .update({ group_name: groupName })
       .eq("id", existing.id);
     if (updErr) throw new Error(`Update failed for "${name}": ${updErr.message}`);
-    return existing.id;
+    id = existing.id;
+  } else {
+    throw new Error(`Insert failed for "${name}": ${error.message}`);
   }
-  throw new Error(`Insert failed for "${name}": ${error.message}`);
+
+  // Staples -> membership in the "Staples" list (idempotent via PK).
+  if (isStaple) {
+    const { error: memErr } = await supabase
+      .from("ingredient_list_memberships")
+      .insert({ ingredient_id: id, list_name: "Staples" });
+    if (memErr && memErr.code !== "23505") {
+      throw new Error(`Staples membership failed for "${name}": ${memErr.message}`);
+    }
+  }
+  return id;
 }
 
 async function upsertRecipe(fields) {

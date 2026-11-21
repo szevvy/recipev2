@@ -49,7 +49,7 @@ const OPTIONS: Option[] = [
   },
   {
     value: "later",
-    label: "Maybe later",
+    label: "Later",
     Icon: Clock,
     // Muted / deferred — no bright colour, same visual weight as 'bought'
     // but without the strikethrough on the row.

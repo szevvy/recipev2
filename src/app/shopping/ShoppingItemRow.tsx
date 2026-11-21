@@ -195,10 +195,21 @@ function ExpandedPanel({ item }: { item: ShoppingItemWithIngredient }) {
   const [saved, setSaved] = useState(false);
   const [, startTransition] = useTransition();
   const invalidate = useInvalidateBootstrap();
+  const qc = useQueryClient();
 
   useEffect(() => {
     setNotes(item.notes ?? "");
   }, [item.notes]);
+
+  // Look up which lists this ingredient belongs to so staple-source sources
+  // can be labelled "from <list>" instead of a generic "from staples".
+  const ingredientLists: string[] = (() => {
+    const id = item.ingredients?.id;
+    if (!id) return [];
+    const bootstrap = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
+    const ing = bootstrap?.ingredients.find((i) => i.id === id);
+    return ing?.lists ?? [];
+  })();
 
   function commitNotes() {
     const nextTrim = notes.trim();
@@ -244,7 +255,7 @@ function ExpandedPanel({ item }: { item: ShoppingItemWithIngredient }) {
               <li key={s.id} className="flex items-center gap-2 text-[var(--foreground)]">
                 <SourceIcon kind={s.kind} />
                 <span className="font-medium">{s.quantity ?? "–"}</span>
-                <span>{sourceLabel(s)}</span>
+                <span>{sourceLabel(s, ingredientLists)}</span>
               </li>
             ))}
           </ul>
@@ -260,8 +271,14 @@ function SourceIcon({ kind }: { kind: "meal" | "staple" | "manual" }) {
   return <ShoppingBasket size={12} className="text-[var(--accent)]" />;
 }
 
-function sourceLabel(s: ShoppingItemWithIngredient["shopping_item_sources"][number]): string {
-  if (s.kind === "staple") return "from staples";
+function sourceLabel(
+  s: ShoppingItemWithIngredient["shopping_item_sources"][number],
+  ingredientLists: string[],
+): string {
+  if (s.kind === "staple") {
+    if (ingredientLists.length === 0) return "from a list";
+    return `from ${ingredientLists.join(", ")}`;
+  }
   if (s.kind === "manual") return "manually added";
   // Custom meals have no `recipes` row — their title lives on
   // meal_plan.custom_name. Fall back to that when the recipe is absent.

@@ -33,10 +33,17 @@ export type ListMemberView = {
 
 // Terse "last bought" badge. Keeps the row scannable:
 //   today · yest · 3d · 2w · 3mo · 1y
+//
+// Compares *local* calendar days (midnight-to-midnight in the user's
+// timezone) so a 11pm purchase doesn't read as "today" the next morning
+// when the server happens to write the UTC timestamp.
 function formatLastPurchased(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "";
-  const days = Math.floor((Date.now() - then) / 86_400_000);
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return "";
+  const now = new Date();
+  const thenDay = new Date(then.getFullYear(), then.getMonth(), then.getDate());
+  const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((nowDay.getTime() - thenDay.getTime()) / 86_400_000);
   if (days <= 0) return "today";
   if (days === 1) return "yest";
   if (days < 7) return `${days}d`;

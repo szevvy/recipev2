@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Trash2, Save, X } from "lucide-react";
+import { GripVertical, Trash2, Save, X } from "lucide-react";
 import type { Ingredient, RecipeWithIngredients } from "@/lib/types";
 import { IngredientPicker } from "@/components/IngredientPicker";
 import {
@@ -76,9 +76,20 @@ export function RecipeEditor({
   const [rows, setRows] = useState<Row[]>(() => rowsFromRecipe(recipe));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   function updateRow(idx: number, patch: Partial<Row>) {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  }
+
+  function moveRow(from: number, to: number) {
+    if (from === to) return;
+    setRows((prev) => {
+      const next = [...prev];
+      const [row] = next.splice(from, 1);
+      next.splice(to, 0, row);
+      return next;
+    });
   }
 
   function pickRowIngredient(idx: number, ing: Ingredient) {
@@ -233,11 +244,46 @@ export function RecipeEditor({
           {rows.map((row, idx) => {
             const isLast = idx === rows.length - 1;
             const isEmpty = !row.ingredient_name.trim();
+            const draggable = !(isLast && isEmpty);
             return (
               <li
                 key={row.tempId}
-                className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1.5fr_auto] gap-2 items-start"
+                onDragOver={
+                  draggable
+                    ? (e) => {
+                        e.preventDefault();
+                      }
+                    : undefined
+                }
+                onDrop={
+                  draggable
+                    ? (e) => {
+                        e.preventDefault();
+                        if (dragIndex !== null) moveRow(dragIndex, idx);
+                        setDragIndex(null);
+                      }
+                    : undefined
+                }
+                className={
+                  "grid grid-cols-[auto_1fr] sm:grid-cols-[auto_2fr_1fr_1.5fr_auto] gap-2 items-start transition-opacity " +
+                  (dragIndex === idx ? "opacity-50" : "")
+                }
               >
+                {draggable ? (
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={() => setDragIndex(idx)}
+                    onDragEnd={() => setDragIndex(null)}
+                    title="Drag to reorder"
+                    aria-label="Drag to reorder"
+                    className="self-center cursor-grab active:cursor-grabbing text-[var(--muted)] hover:text-[var(--foreground)] p-1 touch-none"
+                  >
+                    <GripVertical size={14} />
+                  </button>
+                ) : (
+                  <span className="w-6" aria-hidden />
+                )}
                 <IngredientPicker
                   ingredients={ingredientsLibrary}
                   value={row.ingredient_id}

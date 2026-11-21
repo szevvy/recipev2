@@ -28,6 +28,7 @@ export async function createIngredientAction(fd: FormData): Promise<ActionResult
         name: input.name,
         group_name: input.group_name,
         linked_recipe_id: input.linked_recipe_id ?? null,
+        shelf_life_days: input.shelf_life_days ?? null,
       })
       .select("id")
       .single();
@@ -64,6 +65,7 @@ export async function updateIngredientAction(id: string, fd: FormData): Promise<
         name: input.name,
         group_name: input.group_name,
         linked_recipe_id: input.linked_recipe_id ?? null,
+        shelf_life_days: input.shelf_life_days ?? null,
       })
       .eq("id", id);
     if (error) {

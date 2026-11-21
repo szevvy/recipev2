@@ -211,12 +211,27 @@ export function IngredientRow({
             name="linked_recipe_id"
             value={editLinkedRecipeId ?? ""}
           />
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <LinkedRecipePicker
               value={editLinkedRecipeId}
               recipes={recipes}
               onChange={setEditLinkedRecipeId}
             />
+            <label className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)]">
+              <span>Shelf life</span>
+              <input
+                name="shelf_life_days"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={1}
+                defaultValue={ingredient.shelf_life_days ?? ""}
+                placeholder="—"
+                title="1 = use the day you buy it, 2 = that day or next, etc. Blank = no limit."
+                className="w-14 rounded-md border border-[var(--border)] bg-white px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
+              />
+              <span>days</span>
+            </label>
           </div>
           <div className="flex gap-2 justify-end items-center">
             {error && <p className="text-xs text-red-600 mr-auto">{error}</p>}

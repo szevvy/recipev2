@@ -266,6 +266,7 @@ function ListMemberRow({
               name: ingredient.name,
               group_name: ingredient.group_name,
               linked_recipe_id: ingredient.linked_recipe_id,
+              shelf_life_days: ingredient.shelf_life_days,
             }
           : null,
         shopping_item_sources: [],

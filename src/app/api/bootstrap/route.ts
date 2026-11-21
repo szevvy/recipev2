@@ -34,7 +34,7 @@ export async function GET() {
     supabase
       .from("shopping_items")
       .select(
-        "*, ingredients(id, name, group_name, linked_recipe_id), shopping_item_sources!shopping_item_id(id, kind, source_ref, quantity, meal_plan_id, meal_plan(date, custom_name, recipes(id, name)))",
+        "*, ingredients(id, name, group_name, linked_recipe_id, shelf_life_days), shopping_item_sources!shopping_item_id(id, kind, source_ref, quantity, meal_plan_id, meal_plan(date, custom_name, recipes(id, name)))",
       )
       .order("created_at"),
     supabase.from("ingredients").select("*").order("name"),

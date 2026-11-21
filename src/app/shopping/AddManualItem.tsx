@@ -55,6 +55,7 @@ export function AddManualItem({ ingredients }: { ingredients: Ingredient[] }) {
             name: matched.name,
             group_name: matched.group_name,
             linked_recipe_id: matched.linked_recipe_id,
+            shelf_life_days: matched.shelf_life_days,
           }
         : null,
       shopping_item_sources: [

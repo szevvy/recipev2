@@ -27,6 +27,7 @@ type IngredientInsert = {
   name: string;
   group_name?: string | null;
   linked_recipe_id?: string | null;
+  shelf_life_days?: number | null;
   staple_state?: StapleState;
 };
 

@@ -27,6 +27,20 @@ export const IngredientInputSchema = z.object({
     .nullable()
     .optional()
     .transform((v) => v ?? null),
+  // Optional positive integer; blank input becomes null.
+  shelf_life_days: z
+    .union([z.string(), z.number(), z.null()])
+    .transform((v) => {
+      if (v == null) return null;
+      if (typeof v === "number") return Number.isFinite(v) && v > 0 ? Math.floor(v) : null;
+      const trimmed = v.trim();
+      if (!trimmed) return null;
+      const n = Number.parseInt(trimmed, 10);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })
+    .pipe(z.number().int().positive().nullable())
+    .optional()
+    .transform((v) => v ?? null),
 });
 
 export type IngredientInput = z.infer<typeof IngredientInputSchema>;
@@ -51,6 +65,7 @@ export function parseIngredientForm(fd: FormData): IngredientInput {
     group_name: String(fd.get("group_name") ?? ""),
     lists,
     linked_recipe_id: String(fd.get("linked_recipe_id") ?? ""),
+    shelf_life_days: String(fd.get("shelf_life_days") ?? ""),
   };
   return IngredientInputSchema.parse(raw);
 }

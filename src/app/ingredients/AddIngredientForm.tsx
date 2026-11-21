@@ -49,6 +49,13 @@ export function AddIngredientForm({
     const rowId = typeof crypto !== "undefined" ? crypto.randomUUID() : "";
     fd.set("id", rowId);
 
+    const shelfRaw = String(fd.get("shelf_life_days") ?? "").trim();
+    const shelfLifeDays =
+      shelfRaw && Number.isFinite(Number.parseInt(shelfRaw, 10)) &&
+      Number.parseInt(shelfRaw, 10) > 0
+        ? Number.parseInt(shelfRaw, 10)
+        : null;
+
     const nowIso = new Date().toISOString();
     const newIng: Ingredient = {
       id: rowId,
@@ -56,6 +63,7 @@ export function AddIngredientForm({
       group_name: groupName || null,
       lists: [...lists].sort((a, b) => a.localeCompare(b)),
       linked_recipe_id: linkedRecipeId,
+      shelf_life_days: shelfLifeDays,
       staple_state: "not_checked",
       created_at: nowIso,
       updated_at: nowIso,
@@ -140,12 +148,26 @@ export function AddIngredientForm({
           Add
         </button>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <LinkedRecipePicker
           value={linkedRecipeId}
           recipes={recipes}
           onChange={setLinkedRecipeId}
         />
+        <label className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)]">
+          <span>Shelf life</span>
+          <input
+            name="shelf_life_days"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={1}
+            placeholder="—"
+            title="1 = use the day you buy it, 2 = that day or next, etc. Blank = no limit."
+            className="w-14 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
+          />
+          <span>days</span>
+        </label>
       </div>
       <input
         type="hidden"

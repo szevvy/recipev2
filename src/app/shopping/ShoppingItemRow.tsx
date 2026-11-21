@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import {
+  CalendarClock,
   ChefHat,
   Check,
   Home,
@@ -116,6 +117,7 @@ export function ShoppingItemRow({
   const isLater = state === "later";
   const dimmed = isBought || isLater;
   const notes = item.notes?.trim() ?? "";
+  const buyHint = computeBuyHint(item);
 
   const expandedRingStyle = expanded && accent
     ? { backgroundColor: `${accent.chipBg}8f`, boxShadow: `inset 0 0 0 1px ${accent.chipText}26` }
@@ -166,6 +168,11 @@ export function ShoppingItemRow({
             {item.quantity ? <span className="font-medium">{item.quantity} </span> : null}
             {item.ingredients?.name ?? item.name ?? "(unknown)"}
           </span>
+          {buyHint && (
+            <div className="text-xs italic text-amber-700 mt-0.5 truncate flex items-center gap-1">
+              <CalendarClock size={10} /> {buyHint}
+            </div>
+          )}
           {notes && !expanded && (
             <div className="text-xs italic text-[var(--muted)] mt-0.5 truncate flex items-center gap-1">
               <PencilLine size={10} /> {notes}
@@ -318,6 +325,56 @@ function sourceLabel(
   if (name && day) return `from ${name} (${day})`;
   if (name) return `from ${name}`;
   return "from a planned meal";
+}
+
+// Combine the item's shelf_life_days with each contributing meal's date to
+// decide whether some portion needs to wait before buying. Returns a short
+// hint like "Buy Thu-Fri", "Buy some later", or null when nothing's
+// constrained.
+function computeBuyHint(item: ShoppingItemWithIngredient): string | null {
+  const shelf = item.ingredients?.shelf_life_days ?? null;
+  if (!shelf || shelf < 1) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayMs = today.getTime();
+
+  let immediateMeals = 0;
+  const seen = new Set<string>();
+  let firstWindow: { start: Date; end: Date } | null = null;
+
+  for (const s of item.shopping_item_sources) {
+    if (s.kind !== "meal") continue;
+    const dateStr = s.meal_plan?.date;
+    if (!dateStr) continue;
+    const [y, m, d] = dateStr.split("-").map(Number);
+    if (!y || !m || !d) continue;
+    const mealDate = new Date(y, m - 1, d);
+    const daysFromToday = Math.round((mealDate.getTime() - todayMs) / 86_400_000);
+    if (daysFromToday < 0) continue;
+    if (daysFromToday < shelf) {
+      // Shelf life covers the gap — fine to buy today for this meal.
+      immediateMeals++;
+      continue;
+    }
+    // Needs delaying. Window: [mealDate - shelf + 1, mealDate].
+    const start = new Date(mealDate);
+    start.setDate(start.getDate() - shelf + 1);
+    const key = `${start.getTime()}|${mealDate.getTime()}`;
+    if (!seen.has(key)) {
+      if (!firstWindow) firstWindow = { start, end: mealDate };
+      seen.add(key);
+    }
+  }
+
+  if (seen.size === 0) return null;
+  const prefix = immediateMeals > 0 ? "Buy some" : "Buy";
+  if (seen.size > 1 || !firstWindow) return `${prefix} later`;
+  const sameDay = firstWindow.start.getTime() === firstWindow.end.getTime();
+  const startLabel = format(firstWindow.start, "EEE");
+  const endLabel = format(firstWindow.end, "EEE");
+  const window = sameDay ? startLabel : `${startLabel}-${endLabel}`;
+  return `${prefix} ${window}`;
 }
 
 export function HaveRow({ item }: { item: ShoppingItemWithIngredient }) {

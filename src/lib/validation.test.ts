@@ -32,6 +32,7 @@ describe("parseIngredientForm", () => {
       group_name: "Baking",
       lists: ["Staples", "Baking essentials"],
       linked_recipe_id: null,
+      shelf_life_days: null,
     });
   });
 
@@ -79,8 +80,41 @@ describe("IngredientInputSchema direct", () => {
       group_name: "",
       lists: [],
       linked_recipe_id: null,
+      shelf_life_days: null,
     });
     expect(result.group_name).toBeNull();
+  });
+
+  it("parses shelf_life_days from a numeric string", () => {
+    const result = IngredientInputSchema.parse({
+      name: "Mince",
+      group_name: "Meat",
+      lists: [],
+      linked_recipe_id: null,
+      shelf_life_days: "3",
+    });
+    expect(result.shelf_life_days).toBe(3);
+  });
+
+  it("treats blank/invalid shelf_life_days as null", () => {
+    expect(
+      IngredientInputSchema.parse({
+        name: "Salt",
+        group_name: "",
+        lists: [],
+        linked_recipe_id: null,
+        shelf_life_days: "",
+      }).shelf_life_days,
+    ).toBeNull();
+    expect(
+      IngredientInputSchema.parse({
+        name: "Salt",
+        group_name: "",
+        lists: [],
+        linked_recipe_id: null,
+        shelf_life_days: "0",
+      }).shelf_life_days,
+    ).toBeNull();
   });
 
   it("accepts a uuid for linked_recipe_id", () => {
@@ -89,6 +123,7 @@ describe("IngredientInputSchema direct", () => {
       group_name: "Jarred",
       lists: [],
       linked_recipe_id: "11111111-1111-4111-8111-111111111111",
+      shelf_life_days: null,
     });
     expect(result.linked_recipe_id).toBe("11111111-1111-4111-8111-111111111111");
   });
@@ -99,6 +134,7 @@ describe("IngredientInputSchema direct", () => {
       group_name: "",
       lists: [],
       linked_recipe_id: "",
+      shelf_life_days: null,
     });
     expect(result.linked_recipe_id).toBeNull();
   });

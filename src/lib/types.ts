@@ -13,6 +13,10 @@ export type Ingredient = {
   // the user picks "Need to make" for a shopping row backed by this
   // ingredient, the recipe's ingredients get inserted as child shopping_items.
   linked_recipe_id: string | null;
+  // Optional shelf life in days. 1 = must be used the day of purchase,
+  // 2 = that day or the next, etc. The shopping list uses this to suggest
+  // delayed buy windows when the ingredient would spoil before its meal.
+  shelf_life_days: number | null;
   staple_state: StapleState;
   created_at: string;
   updated_at: string;
@@ -144,7 +148,10 @@ export type ShoppingItemSourceDetail = ShoppingItemSourceRow & {
 
 export type ShoppingItemWithIngredient = ShoppingItem & {
   ingredients:
-    | Pick<Ingredient, "id" | "name" | "group_name" | "linked_recipe_id">
+    | Pick<
+        Ingredient,
+        "id" | "name" | "group_name" | "linked_recipe_id" | "shelf_life_days"
+      >
     | null;
   shopping_item_sources: ShoppingItemSourceDetail[];
 };

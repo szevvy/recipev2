@@ -291,37 +291,34 @@ export async function finishShoppingAction(): Promise<ActionResult> {
     if (histErr) return { ok: false, error: histErr.message };
   }
 
-  // bought meal/manual rows -> have (pantry). Staple bought rows are dropped
-  // here and re-created fresh on next pre-shop review.
-  const { error: stapleBoughtDelErr } = await supabase
-    .from("shopping_items")
-    .delete()
-    .eq("state", "bought")
-    .eq("source", "staple");
-  if (stapleBoughtDelErr) return { ok: false, error: stapleBoughtDelErr.message };
-
+  // Non-staple bought rows become pantry (state=have). Staples are handled
+  // en-masse below.
   const { error: pantryErr } = await supabase
     .from("shopping_items")
     .update({ state: "have" })
-    .eq("state", "bought");
+    .eq("state", "bought")
+    .neq("source", "staple");
   if (pantryErr) return { ok: false, error: pantryErr.message };
 
   // Deferred ('later') items revert to to_buy — "later" has arrived, next
   // trip should treat them as needed again unless the user flips them away.
+  // Skip staples: they're about to be wiped en masse anyway.
   const { error: laterErr } = await supabase
     .from("shopping_items")
     .update({ state: "to_buy" })
-    .eq("state", "later");
+    .eq("state", "later")
+    .neq("source", "staple");
   if (laterErr) return { ok: false, error: laterErr.message };
 
-  // Staples: reset any non-not_checked (incl. have) back to not_checked so
-  // next week's review starts fresh.
-  const { error: resetErr } = await supabase
+  // Staples: wipe every source=staple row regardless of state. The Staples
+  // list on the plan page is the source of truth (ingredient_list_memberships);
+  // after finish-shopping, nothing should surface on the shopping list for
+  // review — you'll pick back up from the plan next trip.
+  const { error: stapleDelErr } = await supabase
     .from("shopping_items")
-    .update({ state: "not_checked" })
-    .eq("source", "staple")
-    .neq("state", "not_checked");
-  if (resetErr) return { ok: false, error: resetErr.message };
+    .delete()
+    .eq("source", "staple");
+  if (stapleDelErr) return { ok: false, error: stapleDelErr.message };
 
   const { error: stampErr } = await supabase
     .from("meal_plan")

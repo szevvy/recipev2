@@ -39,21 +39,19 @@ export function FinishShoppingButton() {
           .map((i) => i.ingredient_id as string),
       );
       const shoppingItems = old.shoppingItems
-        .filter((i) => !(i.state === "bought" && i.source === "staple"))
+        // Wipe every staple row — the Staples list on the plan page is the
+        // source of truth; nothing should linger on the shopping list for
+        // review after a trip.
+        .filter((i) => i.source !== "staple")
         .map((i) => {
-          if (i.state === "bought" && i.source !== "staple") {
+          if (i.state === "bought") {
             return { ...i, state: "have" as const };
           }
           if (i.state === "later") {
             return { ...i, state: "to_buy" as const };
           }
           return i;
-        })
-        .map((i) =>
-          i.source === "staple" && i.state !== "not_checked"
-            ? { ...i, state: "not_checked" as const }
-            : i,
-        );
+        });
       const meals = old.meals.map((m) =>
         m.shopped_at ? m : { ...m, shopped_at: nowIso },
       );

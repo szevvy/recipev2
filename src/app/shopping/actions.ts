@@ -107,6 +107,18 @@ export async function removeShoppingItemAction(id: string): Promise<ActionResult
   return { ok: true };
 }
 
+// Wipe the entire Already-have / pantry drawer. Used when the user wants to
+// start fresh (e.g. they've used up what was there, or the list is stale).
+export async function clearHaveItemsAction(): Promise<ActionResult> {
+  const { error } = await supabaseAdmin()
+    .from("shopping_items")
+    .delete()
+    .eq("state", "have");
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/shopping");
+  return { ok: true };
+}
+
 export async function addManualItemAction(
   ingredientId: string,
   quantity: string,

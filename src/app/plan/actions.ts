@@ -5,8 +5,103 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { syncShoppingList } from "@/lib/shopping-sync";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import type { ShoppingItemState } from "@/lib/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+// Fallback for the plan's expanded ingredient list: when the user picks a
+// state for an ingredient whose shopping_items row has disappeared (e.g.
+// they bought it, finished shopping, then cleared the pantry), we can't
+// rely on sync to recreate it because the meal's shopped_at is still set.
+// So we ensure a row exists + link it to this meal via a 'meal' source.
+export async function setMealIngredientStateAction(
+  mealPlanId: string,
+  ingredientId: string,
+  state: ShoppingItemState,
+): Promise<ActionResult> {
+  if (
+    !["not_checked", "to_buy", "have", "bought", "later", "need_to_make"].includes(
+      state,
+    )
+  ) {
+    return { ok: false, error: "Invalid state" };
+  }
+  const supabase = supabaseAdmin();
+
+  // Find any existing row for this ingredient (unit_key=null bucket) so we
+  // merge instead of duplicating — same policy as setStapleStateAction.
+  const { data: rows } = await supabase
+    .from("shopping_items")
+    .select("id, source, state")
+    .eq("ingredient_id", ingredientId)
+    .is("unit_key", null);
+  const candidates = rows ?? [];
+  const target = candidates[0] ?? null;
+
+  if (state === "not_checked") {
+    // Nothing more to do — if a row exists, drop our meal source row only.
+    // If the row was pure-meal-source with no other sources, let the usual
+    // orphan sweep handle it on next clear/sync.
+    if (target) {
+      const { error: delSrcErr } = await supabase
+        .from("shopping_item_sources")
+        .delete()
+        .eq("shopping_item_id", target.id)
+        .eq("kind", "meal")
+        .eq("meal_plan_id", mealPlanId);
+      if (delSrcErr) return { ok: false, error: delSrcErr.message };
+    }
+    revalidatePath("/shopping");
+    return { ok: true };
+  }
+
+  if (target) {
+    const { error: updErr } = await supabase
+      .from("shopping_items")
+      .update({ state })
+      .eq("id", target.id);
+    if (updErr) return { ok: false, error: updErr.message };
+
+    // Ensure we have a meal-source row pointing at this specific meal.
+    const { data: existingSrc } = await supabase
+      .from("shopping_item_sources")
+      .select("id")
+      .eq("shopping_item_id", target.id)
+      .eq("kind", "meal")
+      .eq("meal_plan_id", mealPlanId)
+      .maybeSingle();
+    if (!existingSrc) {
+      const { error: srcErr } = await supabase
+        .from("shopping_item_sources")
+        .insert({
+          shopping_item_id: target.id,
+          kind: "meal",
+          meal_plan_id: mealPlanId,
+        });
+      if (srcErr) return { ok: false, error: srcErr.message };
+    }
+  } else {
+    const { data: inserted, error } = await supabase
+      .from("shopping_items")
+      .insert({
+        ingredient_id: ingredientId,
+        source: "meal",
+        state,
+      })
+      .select("id")
+      .single();
+    if (error || !inserted) return { ok: false, error: error?.message ?? "insert failed" };
+    const { error: srcErr } = await supabase.from("shopping_item_sources").insert({
+      shopping_item_id: inserted.id,
+      kind: "meal",
+      meal_plan_id: mealPlanId,
+    });
+    if (srcErr) return { ok: false, error: srcErr.message };
+  }
+
+  revalidatePath("/shopping");
+  return { ok: true };
+}
 
 type Supa = SupabaseClient<Database>;
 

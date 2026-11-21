@@ -9,6 +9,7 @@ import {
   type BootstrapData,
 } from "@/lib/queries";
 import { setItemStateAction } from "@/app/shopping/actions";
+import { setMealIngredientStateAction } from "@/app/plan/actions";
 import { StatePicker } from "@/app/shopping/StatePicker";
 import type { MealIngredientView } from "./mealIngredients";
 
@@ -16,7 +17,13 @@ import type { MealIngredientView } from "./mealIngredients";
 // move items between not reviewed / already have / need to buy without
 // leaving the plan. The "bought" tick lives on the shopping list — that's
 // a shopping action, not a planning one.
-export function MealIngredientRow({ view }: { view: MealIngredientView }) {
+export function MealIngredientRow({
+  view,
+  mealId,
+}: {
+  view: MealIngredientView;
+  mealId: string;
+}) {
   const item = view.shoppingItem;
   const initialState: ShoppingItemState = item?.state ?? "not_checked";
   const [state, setState] = useState<ShoppingItemState>(initialState);
@@ -43,19 +50,38 @@ export function MealIngredientRow({ view }: { view: MealIngredientView }) {
   }
 
   function update(next: ShoppingItemState) {
-    // Nothing in the shopping list is tracking this ingredient (e.g. the user
-    // marked it "have" and then removed every meal that needed it before a
-    // new meal was added). Fall back to a bootstrap refetch — the server
-    // sync will create/update the right row.
-    if (!item) {
-      invalidate();
-      return;
-    }
-    if (next === state) return;
+    if (next === state && item) return;
     const previous = state;
     setState(next);
-    patchCacheState(next);
     setError(null);
+
+    // No shopping_item yet — happens when the ingredient was bought +
+    // cleared from pantry (sync won't recreate the row because the meal's
+    // shopped_at is still set). Create one tied to this meal so the user's
+    // state change actually sticks.
+    if (!item || !view.ingredient_id) {
+      startTransition(async () => {
+        if (!view.ingredient_id) {
+          setState(previous);
+          return;
+        }
+        const result = await setMealIngredientStateAction(
+          mealId,
+          view.ingredient_id,
+          next,
+        );
+        if (!result.ok) {
+          setState(previous);
+          setError(result.error);
+        }
+        // Either way, refresh bootstrap so the fresh row shows up in the
+        // plan + shopping list views.
+        invalidate();
+      });
+      return;
+    }
+
+    patchCacheState(next);
     startTransition(async () => {
       const result = await setItemStateAction(item.id, next);
       if (!result.ok) {

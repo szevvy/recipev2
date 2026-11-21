@@ -345,7 +345,11 @@ export function DayCard({
         {expanded && mealIngredients.length > 0 && mealLocal && (
           <ul className="border-t border-[var(--border)]/60 pt-2 space-y-0.5">
             {mealIngredients.map((view) => (
-              <MealIngredientRow key={view.key} view={view} />
+              <MealIngredientRow
+                key={view.key}
+                view={view}
+                mealId={mealLocal.id}
+              />
             ))}
           </ul>
         )}

@@ -4,6 +4,7 @@ import type {
 } from "@/lib/types";
 import {
   formatQuantity,
+  mergeShoppingItems,
   parseQuantity,
   scaleQuantity,
 } from "@/lib/quantity";
@@ -22,6 +23,10 @@ export type MealIngredientView = {
   // Present → row has a real state picker + bought check that mutates the
   // shared row. Absent → nothing in the shopping list is tracking it.
   shoppingItem: ShoppingItemWithIngredient | null;
+  // Sum of this ingredient's contribution from *other* planned meals (per
+  // shopping_item_sources). null when no other meals need it. Shown in the
+  // plan tab so you can see at a glance "1 zucchini + 1 from other meals".
+  otherMealsQuantity: string | null;
 };
 
 function scaleText(quantity: string | null, factor: number): string | null {
@@ -77,6 +82,30 @@ export function buildMealIngredients(
     );
   }
 
+  // Sum contributions from *other* planned meals for this shopping_item.
+  // Reuses the sync's merge logic so quantities with different units render
+  // as "1 cup + 50g" rather than being mashed together.
+  function otherMealsText(
+    shoppingItem: ShoppingItemWithIngredient | null,
+  ): string | null {
+    if (!shoppingItem) return null;
+    const otherSources = shoppingItem.shopping_item_sources.filter(
+      (s) =>
+        s.kind === "meal" && s.meal_plan_id && s.meal_plan_id !== meal.id,
+    );
+    if (otherSources.length === 0) return null;
+    const merged = mergeShoppingItems(
+      otherSources.map((s) => ({
+        ingredient_id: "x",
+        quantity: s.quantity,
+        servings_factor: 1,
+      })),
+    );
+    const parts = merged.map((m) => m.quantity).filter(Boolean) as string[];
+    if (parts.length === 0) return null;
+    return parts.join(" + ");
+  }
+
   if (meal.recipes) {
     const servings = meal.servings ?? meal.recipes.default_servings;
     const factor =
@@ -86,13 +115,17 @@ export function buildMealIngredients(
     const rows = [...meal.recipes.recipe_ingredients].sort(
       (a, b) => a.sort_order - b.sort_order,
     );
-    return rows.map((ri) => ({
-      key: ri.id,
-      ingredient_id: ri.ingredient_id,
-      name: ri.ingredients?.name ?? "(unknown)",
-      quantity: scaleText(ri.quantity, factor),
-      shoppingItem: findLibraryItem(ri.ingredient_id),
-    }));
+    return rows.map((ri) => {
+      const shoppingItem = findLibraryItem(ri.ingredient_id);
+      return {
+        key: ri.id,
+        ingredient_id: ri.ingredient_id,
+        name: ri.ingredients?.name ?? "(unknown)",
+        quantity: scaleText(ri.quantity, factor),
+        shoppingItem,
+        otherMealsQuantity: otherMealsText(shoppingItem),
+      };
+    });
   }
 
   // Custom meal — library-backed rows look up a shared shopping_item, free-text
@@ -102,20 +135,24 @@ export function buildMealIngredients(
   );
   return custom.map((ci) => {
     if (ci.ingredient_id) {
+      const shoppingItem = findLibraryItem(ci.ingredient_id);
       return {
         key: ci.id,
         ingredient_id: ci.ingredient_id,
         name: ci.ingredients?.name ?? "(unknown)",
         quantity: ci.quantity,
-        shoppingItem: findLibraryItem(ci.ingredient_id),
+        shoppingItem,
+        otherMealsQuantity: otherMealsText(shoppingItem),
       };
     }
+    const shoppingItem = findFreeTextItem(ci.name ?? "");
     return {
       key: ci.id,
       ingredient_id: null,
       name: ci.name ?? "(unnamed)",
       quantity: ci.quantity,
-      shoppingItem: findFreeTextItem(ci.name ?? ""),
+      shoppingItem,
+      otherMealsQuantity: otherMealsText(shoppingItem),
     };
   });
 }

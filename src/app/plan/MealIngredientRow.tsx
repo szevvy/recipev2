@@ -85,6 +85,14 @@ export function MealIngredientRow({ view }: { view: MealIngredientView }) {
       >
         {qty ? <span className="font-medium">{qty} </span> : null}
         {view.name}
+        {view.otherMealsQuantity && (
+          <span
+            className="ml-1 text-xs text-[var(--muted)] italic"
+            title="Also needed by other planned meals this week"
+          >
+            + {view.otherMealsQuantity} from other meals
+          </span>
+        )}
       </span>
       {error && <span className="text-[10px] text-red-600 mr-1">{error}</span>}
       <StatePicker state={state} onChange={update} />

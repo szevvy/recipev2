@@ -14,8 +14,14 @@ export function ShoppingTab({ data }: { data: BootstrapData }) {
   const categoryMeta = data.categoryMeta;
 
   const { active, have, counts } = useMemo(() => {
-    const active = items.filter((i) => i.state !== "have");
-    const have = items.filter((i) => i.state === "have");
+    // 'need_to_make' lives in the Already have drawer alongside 'have' so
+    // its recipe children can be reviewed in the main list on their own.
+    const active = items.filter(
+      (i) => i.state !== "have" && i.state !== "need_to_make",
+    );
+    const have = items.filter(
+      (i) => i.state === "have" || i.state === "need_to_make",
+    );
 
     const counts = {
       toBuy: active.filter((i) => i.state === "to_buy").length,

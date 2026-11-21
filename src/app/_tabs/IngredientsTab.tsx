@@ -2,15 +2,21 @@
 
 import { useMemo } from "react";
 import type { BootstrapData } from "@/lib/queries";
-import type { Ingredient } from "@/lib/types";
+import type { Ingredient, Recipe } from "@/lib/types";
 import { AddIngredientForm } from "@/app/ingredients/AddIngredientForm";
 import { IngredientRow } from "@/app/ingredients/IngredientRow";
+
+type RecipeOption = Pick<
+  Recipe,
+  "id" | "name" | "image_url" | "default_servings" | "prep_minutes" | "cook_minutes"
+>;
 
 const UNGROUPED_KEY = "__ungrouped__";
 const UNGROUPED_LABEL = "Ungrouped";
 
 export function IngredientsTab({ data }: { data: BootstrapData }) {
   const ingredients = data.ingredients as Ingredient[];
+  const recipes = data.recipes as RecipeOption[];
 
   const { groupKeys, byGroup, groupSuggestions, knownLists } = useMemo(() => {
     const byGroup = new Map<string, Ingredient[]>();
@@ -48,7 +54,11 @@ export function IngredientsTab({ data }: { data: BootstrapData }) {
         </p>
       </div>
 
-      <AddIngredientForm groupSuggestions={groupSuggestions} knownLists={knownLists} />
+      <AddIngredientForm
+        groupSuggestions={groupSuggestions}
+        knownLists={knownLists}
+        recipes={recipes}
+      />
 
       {ingredients.length === 0 ? (
         <p className="text-[var(--muted)] text-sm italic text-center py-10">
@@ -74,6 +84,7 @@ export function IngredientsTab({ data }: { data: BootstrapData }) {
                       ingredient={ing}
                       groupSuggestions={groupSuggestions}
                       knownLists={knownLists}
+                      recipes={recipes}
                     />
                   ))}
                 </ul>

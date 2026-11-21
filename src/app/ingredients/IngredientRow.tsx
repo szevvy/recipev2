@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Pencil, Trash2, Check, X } from "lucide-react";
+import { ChefHat, Pencil, Trash2, Check, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { Ingredient } from "@/lib/types";
+import type { Ingredient, Recipe } from "@/lib/types";
 import { ListPicker } from "@/components/ListPicker";
+import { LinkedRecipePicker } from "@/components/LinkedRecipePicker";
 import { GroupCombobox } from "@/components/GroupCombobox";
 import {
   BOOTSTRAP_KEY,
@@ -18,17 +19,27 @@ import {
   updateIngredientAction,
 } from "./actions";
 
+type RecipeOption = Pick<
+  Recipe,
+  "id" | "name" | "image_url" | "default_servings" | "prep_minutes" | "cook_minutes"
+>;
+
 export function IngredientRow({
   ingredient,
   groupSuggestions,
   knownLists,
+  recipes,
 }: {
   ingredient: Ingredient;
   groupSuggestions: string[];
   knownLists: string[];
+  recipes: RecipeOption[];
 }) {
   const [editing, setEditing] = useState(false);
   const [editLists, setEditLists] = useState<string[]>(ingredient.lists);
+  const [editLinkedRecipeId, setEditLinkedRecipeId] = useState<string | null>(
+    ingredient.linked_recipe_id,
+  );
   const [deletedLocal, setDeletedLocal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -36,11 +47,15 @@ export function IngredientRow({
   const qc = useQueryClient();
 
   useEffect(() => {
-    if (!editing) setEditLists(ingredient.lists);
-  }, [ingredient.lists, editing]);
+    if (!editing) {
+      setEditLists(ingredient.lists);
+      setEditLinkedRecipeId(ingredient.linked_recipe_id);
+    }
+  }, [ingredient.lists, ingredient.linked_recipe_id, editing]);
 
   function openEdit() {
     setEditLists(ingredient.lists);
+    setEditLinkedRecipeId(ingredient.linked_recipe_id);
     setError(null);
     setEditing(true);
   }
@@ -58,6 +73,7 @@ export function IngredientRow({
       return;
     }
     const nextLists = [...editLists].sort((a, b) => a.localeCompare(b));
+    const nextLinkedRecipeId = editLinkedRecipeId;
     const snapshot = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
     qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
       if (!old) return old;
@@ -69,6 +85,7 @@ export function IngredientRow({
                 name: nextName,
                 group_name: nextGroup || null,
                 lists: nextLists,
+                linked_recipe_id: nextLinkedRecipeId,
                 updated_at: new Date().toISOString(),
               }
             : i,
@@ -189,6 +206,18 @@ export function IngredientRow({
           {editLists.map((l) => (
             <input key={l} type="hidden" name="lists" value={l} />
           ))}
+          <input
+            type="hidden"
+            name="linked_recipe_id"
+            value={editLinkedRecipeId ?? ""}
+          />
+          <div className="flex items-center justify-between gap-2">
+            <LinkedRecipePicker
+              value={editLinkedRecipeId}
+              recipes={recipes}
+              onChange={setEditLinkedRecipeId}
+            />
+          </div>
           <div className="flex gap-2 justify-end items-center">
             {error && <p className="text-xs text-red-600 mr-auto">{error}</p>}
             <button
@@ -219,7 +248,16 @@ export function IngredientRow({
         onToggle={onListToggle}
       />
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-[var(--foreground)] truncate">{ingredient.name}</div>
+        <div className="font-medium text-[var(--foreground)] truncate flex items-center gap-1">
+          <span className="truncate">{ingredient.name}</span>
+          {ingredient.linked_recipe_id && (
+            <ChefHat
+              size={12}
+              className="text-[var(--accent)] shrink-0"
+              aria-label="Make from recipe"
+            />
+          )}
+        </div>
       </div>
       {error && <span className="text-xs text-red-600 mr-1">{error}</span>}
       <button

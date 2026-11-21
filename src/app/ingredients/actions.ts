@@ -27,6 +27,7 @@ export async function createIngredientAction(fd: FormData): Promise<ActionResult
         id: rowId,
         name: input.name,
         group_name: input.group_name,
+        linked_recipe_id: input.linked_recipe_id ?? null,
       })
       .select("id")
       .single();
@@ -62,6 +63,7 @@ export async function updateIngredientAction(id: string, fd: FormData): Promise<
       .update({
         name: input.name,
         group_name: input.group_name,
+        linked_recipe_id: input.linked_recipe_id ?? null,
       })
       .eq("id", id);
     if (error) {

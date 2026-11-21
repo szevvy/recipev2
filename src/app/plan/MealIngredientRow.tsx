@@ -96,7 +96,11 @@ export function MealIngredientRow({ view }: { view: MealIngredientView }) {
         )}
       </span>
       {error && <span className="text-[10px] text-red-600 mr-1">{error}</span>}
-      <StatePicker state={state} onChange={update} />
+      <StatePicker
+        state={state}
+        onChange={update}
+        canMake={!!item?.ingredients?.linked_recipe_id}
+      />
     </li>
   );
 }

@@ -17,6 +17,16 @@ export const IngredientInputSchema = z.object({
   // List memberships are passed as repeated form fields named "lists".
   // Unknown lists are created implicitly when we insert a membership.
   lists: z.array(z.string().trim().min(1).max(60)).default([]),
+  // Optional recipe link — empty string from an unticked FormData entry
+  // normalises to null.
+  linked_recipe_id: z
+    .string()
+    .trim()
+    .transform((v) => (v.length === 0 ? null : v))
+    .pipe(z.string().uuid().nullable())
+    .nullable()
+    .optional()
+    .transform((v) => v ?? null),
 });
 
 export type IngredientInput = z.infer<typeof IngredientInputSchema>;
@@ -40,6 +50,7 @@ export function parseIngredientForm(fd: FormData): IngredientInput {
     name: String(fd.get("name") ?? ""),
     group_name: String(fd.get("group_name") ?? ""),
     lists,
+    linked_recipe_id: String(fd.get("linked_recipe_id") ?? ""),
   };
   return IngredientInputSchema.parse(raw);
 }

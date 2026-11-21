@@ -50,7 +50,12 @@ export function AddManualItem({ ingredients }: { ingredients: Ingredient[] }) {
       unit_key: null,
       created_at: new Date().toISOString(),
       ingredients: matched
-        ? { id: matched.id, name: matched.name, group_name: matched.group_name }
+        ? {
+            id: matched.id,
+            name: matched.name,
+            group_name: matched.group_name,
+            linked_recipe_id: matched.linked_recipe_id,
+          }
         : null,
       shopping_item_sources: [
         {
@@ -58,6 +63,7 @@ export function AddManualItem({ ingredients }: { ingredients: Ingredient[] }) {
           shopping_item_id: rowId,
           kind: "manual",
           meal_plan_id: null,
+          source_ref: null,
           quantity: trimmedQty || null,
           created_at: new Date().toISOString(),
           meal_plan: null,

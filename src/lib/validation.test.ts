@@ -31,6 +31,7 @@ describe("parseIngredientForm", () => {
       name: "Flour",
       group_name: "Baking",
       lists: ["Staples", "Baking essentials"],
+      linked_recipe_id: null,
     });
   });
 
@@ -77,8 +78,29 @@ describe("IngredientInputSchema direct", () => {
       name: "Eggs",
       group_name: "",
       lists: [],
+      linked_recipe_id: null,
     });
     expect(result.group_name).toBeNull();
+  });
+
+  it("accepts a uuid for linked_recipe_id", () => {
+    const result = IngredientInputSchema.parse({
+      name: "Bolognaise sauce",
+      group_name: "Jarred",
+      lists: [],
+      linked_recipe_id: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(result.linked_recipe_id).toBe("11111111-1111-4111-8111-111111111111");
+  });
+
+  it("normalises empty linked_recipe_id to null", () => {
+    const result = IngredientInputSchema.parse({
+      name: "Salt",
+      group_name: "",
+      lists: [],
+      linked_recipe_id: "",
+    });
+    expect(result.linked_recipe_id).toBeNull();
   });
 });
 

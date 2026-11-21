@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  ChefHat,
   Check,
   ChevronDown,
   Clock,
@@ -22,51 +23,65 @@ type Option = {
   textClass: string;
 };
 
-const OPTIONS: Option[] = [
-  {
-    value: "not_checked",
-    label: "Not reviewed",
-    Icon: HelpCircle,
-    // Faint pink tint so unreviewed items are noticeable without screaming.
-    activeClass: "bg-red-50 text-red-500 border-red-200",
-    textClass: "text-red-500",
-  },
-  {
-    value: "have",
-    label: "Already have",
-    Icon: Home,
-    activeClass:
-      "bg-[var(--surface-muted)] text-[var(--sage)] border-[var(--border)]",
-    textClass: "text-[var(--sage)]",
-  },
-  {
-    value: "to_buy",
-    label: "Need to buy",
-    Icon: ShoppingBasket,
-    activeClass:
-      "bg-[var(--surface-muted)] text-[var(--accent)] border-[var(--border)]",
-    textClass: "text-[var(--accent)]",
-  },
-  {
-    value: "later",
-    label: "Later",
-    Icon: Clock,
-    // Muted / deferred — no bright colour, same visual weight as 'bought'
-    // but without the strikethrough on the row.
-    activeClass:
-      "bg-[var(--surface-muted)] text-[var(--muted)] border-[var(--border)]",
-    textClass: "text-[var(--muted)]",
-  },
-];
+const NOT_CHECKED: Option = {
+  value: "not_checked",
+  label: "Not reviewed",
+  Icon: HelpCircle,
+  // Faint pink tint so unreviewed items are noticeable without screaming.
+  activeClass: "bg-red-50 text-red-500 border-red-200",
+  textClass: "text-red-500",
+};
+
+const HAVE: Option = {
+  value: "have",
+  label: "Already have",
+  Icon: Home,
+  activeClass:
+    "bg-[var(--surface-muted)] text-[var(--sage)] border-[var(--border)]",
+  textClass: "text-[var(--sage)]",
+};
+
+const TO_BUY: Option = {
+  value: "to_buy",
+  label: "Need to buy",
+  Icon: ShoppingBasket,
+  activeClass:
+    "bg-[var(--surface-muted)] text-[var(--accent)] border-[var(--border)]",
+  textClass: "text-[var(--accent)]",
+};
+
+const NEED_TO_MAKE: Option = {
+  value: "need_to_make",
+  label: "Need to make",
+  Icon: ChefHat,
+  activeClass:
+    "bg-[var(--surface-muted)] text-[var(--accent)] border-[var(--border)]",
+  textClass: "text-[var(--accent)]",
+};
+
+const LATER: Option = {
+  value: "later",
+  label: "Later",
+  Icon: Clock,
+  // Muted / deferred — no bright colour, same visual weight as 'bought'
+  // but without the strikethrough on the row.
+  activeClass:
+    "bg-[var(--surface-muted)] text-[var(--muted)] border-[var(--border)]",
+  textClass: "text-[var(--muted)]",
+};
 
 export function StatePicker({
   state,
   onChange,
   onRemove,
+  canMake = false,
 }: {
   state: ShoppingItemState;
   onChange: (next: PickState) => void;
   onRemove?: () => void;
+  // true when the backing ingredient has a linked_recipe_id — swaps the
+  // Need-to-buy slot for Need-to-make.
+  canMake?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -81,10 +96,13 @@ export function StatePicker({
     return () => document.removeEventListener("mousedown", onDown);
   }, []);
 
-  // When an item is bought, keep showing its 'to_buy' chip (basket) so the
-  // picker always reflects a real option — ticking bought no longer swaps
-  // every icon to a grey question mark.
-  const displayValue: PickState = state === "bought" ? "to_buy" : state;
+  const buyOrMake = canMake ? NEED_TO_MAKE : TO_BUY;
+  const OPTIONS: Option[] = [NOT_CHECKED, HAVE, buyOrMake, LATER];
+
+  // When an item is bought, keep showing the buy/make chip (basket/chef) so
+  // the picker always reflects a real option.
+  const displayValue: PickState =
+    state === "bought" ? buyOrMake.value : (state as PickState);
   const current = OPTIONS.find((o) => o.value === displayValue) ?? OPTIONS[0];
 
   return (

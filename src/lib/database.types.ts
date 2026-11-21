@@ -26,6 +26,7 @@ type IngredientInsert = {
   id?: string;
   name: string;
   group_name?: string | null;
+  linked_recipe_id?: string | null;
   staple_state?: StapleState;
 };
 
@@ -158,10 +159,12 @@ export type Database = {
           shopping_item_id: string;
           kind: ShoppingItemSourceKind;
           meal_plan_id?: string | null;
+          source_ref?: string | null;
           quantity?: string | null;
         };
         Update: {
           quantity?: string | null;
+          source_ref?: string | null;
         };
         Relationships: [];
       };

@@ -8,6 +8,11 @@ export type Ingredient = {
   // DB column on ingredients. "Staples" is the default list; users can add
   // arbitrary lists ("Dessert", "Camping") by just typing a name.
   lists: string[];
+  // Optional pointer to a recipe the user can make instead of buying — e.g.
+  // the "Bolognaise sauce" ingredient points to the bolognaise recipe. When
+  // the user picks "Need to make" for a shopping row backed by this
+  // ingredient, the recipe's ingredients get inserted as child shopping_items.
+  linked_recipe_id: string | null;
   staple_state: StapleState;
   created_at: string;
   updated_at: string;
@@ -86,16 +91,21 @@ export type MealPlanWithRecipe = MealPlanEntry & {
   meal_plan_custom_ingredients: MealPlanCustomIngredientWithLink[];
 };
 
-export type ShoppingItemSource = "meal" | "staple" | "manual";
+export type ShoppingItemSource = "meal" | "staple" | "manual" | "recipe";
 // "later" = reviewed and deferred — stays visible on the shopping list but
 // greyed out (no strikethrough). Distinct from "have" (in pantry) and
 // "bought" (grabbed this trip).
+// "need_to_make" = the ingredient points to a linked recipe and the user
+// is going to cook it instead of buying — the recipe's ingredients are
+// inserted as child shopping_items; the parent hides from the main list
+// and shows in Already Have (labelled "To make").
 export type ShoppingItemState =
   | "not_checked"
   | "to_buy"
   | "have"
   | "bought"
-  | "later";
+  | "later"
+  | "need_to_make";
 
 export type ShoppingItem = {
   id: string;
@@ -110,13 +120,16 @@ export type ShoppingItem = {
   created_at: string;
 };
 
-export type ShoppingItemSourceKind = "meal" | "staple" | "manual";
+export type ShoppingItemSourceKind = "meal" | "staple" | "manual" | "recipe";
 
 export type ShoppingItemSourceRow = {
   id: string;
   shopping_item_id: string;
   kind: ShoppingItemSourceKind;
   meal_plan_id: string | null;
+  // When kind='recipe', this points at the parent shopping_items.id whose
+  // need_to_make state spawned this row.
+  source_ref: string | null;
   quantity: string | null;
   created_at: string;
 };
@@ -130,7 +143,9 @@ export type ShoppingItemSourceDetail = ShoppingItemSourceRow & {
 };
 
 export type ShoppingItemWithIngredient = ShoppingItem & {
-  ingredients: Pick<Ingredient, "id" | "name" | "group_name"> | null;
+  ingredients:
+    | Pick<Ingredient, "id" | "name" | "group_name" | "linked_recipe_id">
+    | null;
   shopping_item_sources: ShoppingItemSourceDetail[];
 };
 

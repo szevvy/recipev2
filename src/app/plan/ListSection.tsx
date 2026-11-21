@@ -23,6 +23,7 @@ export type ListMemberView = {
   group_name: string | null;
   state: ShoppingItemState;
   last_purchased_at: string | null;
+  linked_recipe_id: string | null;
 };
 
 // Terse "last bought" badge. Keeps the row scannable:
@@ -230,6 +231,7 @@ function ListMemberRow({
               id: ingredient.id,
               name: ingredient.name,
               group_name: ingredient.group_name,
+              linked_recipe_id: ingredient.linked_recipe_id,
             }
           : null,
         shopping_item_sources: [],
@@ -292,7 +294,11 @@ function ListMemberRow({
         </span>
       )}
       {error && <span className="text-xs text-red-600">{error}</span>}
-      <StatePicker state={state} onChange={update} />
+      <StatePicker
+        state={state}
+        onChange={update}
+        canMake={!!item.linked_recipe_id}
+      />
     </li>
   );
 }

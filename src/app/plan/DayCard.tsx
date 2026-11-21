@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
-import { ChevronDown, PencilLine, Plus, X } from "lucide-react";
+import { ChefHat, ChevronDown, PencilLine, Plus, X } from "lucide-react";
 import { format, isToday, isPast } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import type {
@@ -349,6 +349,21 @@ export function DayCard({
             ))}
           </ul>
         )}
+        {mealLocal &&
+          mealIngredients
+            .filter((view) => view.shoppingItem?.state === "need_to_make")
+            .map((view) => (
+              <div
+                key={`make-${view.key}`}
+                className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs text-amber-900"
+              >
+                <ChefHat size={14} className="text-amber-700 shrink-0" />
+                <span>
+                  Remember to make <span className="font-medium">{view.name}</span> for this
+                  meal.
+                </span>
+              </div>
+            ))}
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>
 

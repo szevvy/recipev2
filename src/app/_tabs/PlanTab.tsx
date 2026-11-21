@@ -82,6 +82,7 @@ export function PlanTab({ data }: { data: BootstrapData }) {
         group_name: ing.group_name,
         state: stapleRowByIngredient.get(ing.id)?.state ?? "not_checked",
         last_purchased_at: lastPurchasedByIngredient.get(ing.id) ?? null,
+        linked_recipe_id: ing.linked_recipe_id,
       };
       for (const listName of ing.lists) {
         const bucket = membersByList.get(listName) ?? [];

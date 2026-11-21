@@ -38,10 +38,23 @@ export function HaveSection({ items }: { items: ShoppingItemWithIngredient[] }) 
     setError(null);
     qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
       if (!old) return old;
-      return {
-        ...old,
-        shoppingItems: old.shoppingItems.filter((i) => i.state !== "have"),
-      };
+      // Drop drawer contents (have + need_to_make) plus any recipe-source
+      // children that would be orphaned by removing their need_to_make parent.
+      const droppedIds = new Set(
+        old.shoppingItems
+          .filter((i) => i.state === "have" || i.state === "need_to_make")
+          .map((i) => i.id),
+      );
+      const shoppingItems = old.shoppingItems.filter((i) => {
+        if (droppedIds.has(i.id)) return false;
+        if (i.source !== "recipe") return true;
+        // Keep the child only if at least one of its sources is NOT a
+        // recipe source pointing at a dropped parent.
+        return i.shopping_item_sources.some(
+          (s) => s.kind !== "recipe" || !droppedIds.has(s.source_ref ?? ""),
+        );
+      });
+      return { ...old, shoppingItems };
     });
     startTransition(async () => {
       const result = await clearHaveItemsAction();

@@ -4,23 +4,32 @@ import { useRef, useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ListPicker } from "@/components/ListPicker";
+import { LinkedRecipePicker } from "@/components/LinkedRecipePicker";
 import { GroupCombobox } from "@/components/GroupCombobox";
 import {
   BOOTSTRAP_KEY,
   useInvalidateBootstrap,
   type BootstrapData,
 } from "@/lib/queries";
-import type { Ingredient } from "@/lib/types";
+import type { Ingredient, Recipe } from "@/lib/types";
 import { createIngredientAction } from "./actions";
+
+type RecipeOption = Pick<
+  Recipe,
+  "id" | "name" | "image_url" | "default_servings" | "prep_minutes" | "cook_minutes"
+>;
 
 export function AddIngredientForm({
   groupSuggestions,
   knownLists,
+  recipes,
 }: {
   groupSuggestions: string[];
   knownLists: string[];
+  recipes: RecipeOption[];
 }) {
   const [lists, setLists] = useState<string[]>([]);
+  const [linkedRecipeId, setLinkedRecipeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
@@ -46,6 +55,7 @@ export function AddIngredientForm({
       name,
       group_name: groupName || null,
       lists: [...lists].sort((a, b) => a.localeCompare(b)),
+      linked_recipe_id: linkedRecipeId,
       staple_state: "not_checked",
       created_at: nowIso,
       updated_at: nowIso,
@@ -62,6 +72,7 @@ export function AddIngredientForm({
 
     form.reset();
     setLists([]);
+    setLinkedRecipeId(null);
     setError(null);
 
     startTransition(async () => {
@@ -129,6 +140,18 @@ export function AddIngredientForm({
           Add
         </button>
       </div>
+      <div className="flex items-center gap-3">
+        <LinkedRecipePicker
+          value={linkedRecipeId}
+          recipes={recipes}
+          onChange={setLinkedRecipeId}
+        />
+      </div>
+      <input
+        type="hidden"
+        name="linked_recipe_id"
+        value={linkedRecipeId ?? ""}
+      />
       {lists.map((l) => (
         <input key={l} type="hidden" name="lists" value={l} />
       ))}

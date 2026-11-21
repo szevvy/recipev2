@@ -105,6 +105,8 @@ export function ShoppingItemRow({
   if (state === "have") return null;
 
   const isBought = state === "bought";
+  const isLater = state === "later";
+  const dimmed = isBought || isLater;
   const notes = item.notes?.trim() ?? "";
 
   const expandedRingStyle = expanded && accent
@@ -124,7 +126,7 @@ export function ShoppingItemRow({
       <div
         className={
           "flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors cursor-pointer " +
-          (isBought ? "opacity-50" : "") +
+          (dimmed ? "opacity-50 " : "") +
           (expanded ? "" : hoverTintClass)
         }
         onMouseEnter={(e) => {

@@ -44,6 +44,9 @@ export function FinishShoppingButton() {
           if (i.state === "bought" && i.source !== "staple") {
             return { ...i, state: "have" as const };
           }
+          if (i.state === "later") {
+            return { ...i, state: "to_buy" as const };
+          }
           return i;
         })
         .map((i) =>

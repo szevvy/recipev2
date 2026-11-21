@@ -69,6 +69,7 @@ export function MealIngredientRow({ view }: { view: MealIngredientView }) {
 
   const isBought = state === "bought";
   const isHave = state === "have";
+  const isLater = state === "later";
   const qty = view.quantity ?? "";
 
   return (
@@ -78,7 +79,7 @@ export function MealIngredientRow({ view }: { view: MealIngredientView }) {
           "flex-1 text-sm min-w-0 truncate " +
           (isBought
             ? "line-through text-[var(--muted)]"
-            : isHave
+            : isHave || isLater
             ? "text-[var(--muted)]"
             : "text-[var(--foreground)]")
         }

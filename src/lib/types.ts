@@ -87,7 +87,15 @@ export type MealPlanWithRecipe = MealPlanEntry & {
 };
 
 export type ShoppingItemSource = "meal" | "staple" | "manual";
-export type ShoppingItemState = "not_checked" | "to_buy" | "have" | "bought";
+// "later" = reviewed and deferred — stays visible on the shopping list but
+// greyed out (no strikethrough). Distinct from "have" (in pantry) and
+// "bought" (grabbed this trip).
+export type ShoppingItemState =
+  | "not_checked"
+  | "to_buy"
+  | "have"
+  | "bought"
+  | "later";
 
 export type ShoppingItem = {
   id: string;

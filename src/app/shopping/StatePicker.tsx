@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, HelpCircle, Home, ShoppingBasket, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Clock,
+  HelpCircle,
+  Home,
+  ShoppingBasket,
+  Trash2,
+} from "lucide-react";
 import type { ShoppingItemState } from "@/lib/types";
 
 type PickState = Exclude<ShoppingItemState, "bought">;
@@ -38,6 +46,16 @@ const OPTIONS: Option[] = [
     activeClass:
       "bg-[var(--surface-muted)] text-[var(--accent)] border-[var(--border)]",
     textClass: "text-[var(--accent)]",
+  },
+  {
+    value: "later",
+    label: "Maybe later",
+    Icon: Clock,
+    // Muted / deferred — no bright colour, same visual weight as 'bought'
+    // but without the strikethrough on the row.
+    activeClass:
+      "bg-[var(--surface-muted)] text-[var(--muted)] border-[var(--border)]",
+    textClass: "text-[var(--muted)]",
   },
 ];
 

@@ -37,7 +37,7 @@ export async function setStapleStateAction(
   state: ShoppingItemState,
   rowId?: string,
 ): Promise<ActionResult> {
-  if (!["not_checked", "to_buy", "have", "bought"].includes(state)) {
+  if (!["not_checked", "to_buy", "have", "bought", "later"].includes(state)) {
     return { ok: false, error: "Invalid state" };
   }
   const supabase = supabaseAdmin();
@@ -101,7 +101,7 @@ export async function setItemStateAction(
   id: string,
   state: ShoppingItemState,
 ): Promise<ActionResult> {
-  if (!["not_checked", "to_buy", "have", "bought"].includes(state)) {
+  if (!["not_checked", "to_buy", "have", "bought", "later"].includes(state)) {
     return { ok: false, error: "Invalid state" };
   }
   const { error } = await supabaseAdmin()
@@ -305,6 +305,14 @@ export async function finishShoppingAction(): Promise<ActionResult> {
     .update({ state: "have" })
     .eq("state", "bought");
   if (pantryErr) return { ok: false, error: pantryErr.message };
+
+  // Deferred ('later') items revert to to_buy — "later" has arrived, next
+  // trip should treat them as needed again unless the user flips them away.
+  const { error: laterErr } = await supabase
+    .from("shopping_items")
+    .update({ state: "to_buy" })
+    .eq("state", "later");
+  if (laterErr) return { ok: false, error: laterErr.message };
 
   // Staples: reset any non-not_checked (incl. have) back to not_checked so
   // next week's review starts fresh.

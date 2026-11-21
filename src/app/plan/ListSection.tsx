@@ -259,7 +259,14 @@ function ListMemberRow({
     });
   }
 
-  const nameStyle = chipText ? { color: `${chipText}d9` } : undefined;
+  // Have / later (deferred) / bought rows are muted — the user has already
+  // made a decision on them, so they should fade into the background.
+  const dimmed = state === "have" || state === "later" || state === "bought";
+  const nameStyle = chipText
+    ? { color: `${chipText}${dimmed ? "80" : "d9"}` }
+    : dimmed
+    ? { color: "var(--muted)" }
+    : undefined;
   const ageStyle = chipText ? { color: `${chipText}99` } : undefined;
   const lastBought = item.last_purchased_at
     ? formatLastPurchased(item.last_purchased_at)
@@ -267,7 +274,12 @@ function ListMemberRow({
 
   return (
     <li className="flex items-center gap-2 px-2 py-1.5">
-      <span className="flex-1 text-sm truncate" style={nameStyle}>
+      <span
+        className={
+          "flex-1 text-sm truncate " + (state === "bought" ? "line-through" : "")
+        }
+        style={nameStyle}
+      >
         {item.name}
       </span>
       {lastBought && (

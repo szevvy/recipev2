@@ -75,10 +75,42 @@ export function AddManualItem({ ingredients }: { ingredients: Ingredient[] }) {
     setError(null);
 
     startTransition(async () => {
-      const result = matched
-        ? await addManualItemAction(matched.id, currentQty, rowId)
-        : await addOneOffItemAction(typed, currentQty, rowId);
-
+      if (matched) {
+        const result = await addManualItemAction(matched.id, currentQty, rowId);
+        if (!result.ok) {
+          qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              shoppingItems: old.shoppingItems.filter((i) => i.id !== rowId),
+            };
+          });
+          setError(result.error);
+          invalidate();
+          return;
+        }
+        if (result.merged) {
+          // Server folded this add into an existing row. Drop our optimistic
+          // stub and bump the real row's quantity + state in cache so there
+          // are no duplicates. Sources (the "manually added" chip in the
+          // expanded panel) land on the next bootstrap refetch.
+          qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              shoppingItems: old.shoppingItems
+                .filter((i) => i.id !== rowId)
+                .map((i) =>
+                  i.id === result.shoppingItemId
+                    ? { ...i, quantity: result.quantity, state: result.state }
+                    : i,
+                ),
+            };
+          });
+        }
+        return;
+      }
+      const result = await addOneOffItemAction(typed, currentQty, rowId);
       if (!result.ok) {
         qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
           if (!old) return old;

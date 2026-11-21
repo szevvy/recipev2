@@ -3,9 +3,23 @@
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
 import { syncShoppingList } from "@/lib/shopping-sync";
+import { formatQuantity, parseQuantity } from "@/lib/quantity";
 import type { ShoppingItemState } from "@/lib/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+// Result of a manual add. When `merged` is true the client should drop its
+// optimistic row (identified by the UUID it generated and passed in as rowId)
+// and update `shoppingItemId`'s quantity + state in its cache.
+export type AddManualItemResult =
+  | {
+      ok: true;
+      merged: boolean;
+      shoppingItemId: string;
+      quantity: string | null;
+      state: ShoppingItemState;
+    }
+  | { ok: false; error: string };
 
 export async function syncShoppingListAction(): Promise<ActionResult> {
   const result = await syncShoppingList();
@@ -123,10 +137,62 @@ export async function addManualItemAction(
   ingredientId: string,
   quantity: string,
   rowId?: string,
-): Promise<ActionResult> {
+): Promise<AddManualItemResult> {
   if (!ingredientId) return { ok: false, error: "Pick an ingredient" };
   const trimmed = quantity.trim();
   const supabase = supabaseAdmin();
+  const parsed = parseQuantity(trimmed || null);
+
+  // If the input is parseable (has a numeric qty), try to merge into an
+  // existing shopping_items row with the same ingredient + unit — regardless
+  // of its source (meal / staple / manual). Prevents duplicates like
+  // "1 zucchini" (from a meal) + "1 zucchini" (manual add) sitting side by side.
+  if (parsed.qty != null) {
+    const { data: candidates, error: fetchErr } = await supabase
+      .from("shopping_items")
+      .select("id, quantity, state")
+      .eq("ingredient_id", ingredientId);
+    if (fetchErr) return { ok: false, error: fetchErr.message };
+    const match = (candidates ?? []).find((r) => {
+      const existingParsed = parseQuantity(r.quantity);
+      return existingParsed.qty != null && existingParsed.unit === parsed.unit;
+    });
+    if (match) {
+      const existingParsed = parseQuantity(match.quantity);
+      const summed = (existingParsed.qty ?? 0) + parsed.qty;
+      const mergedQuantity =
+        formatQuantity(summed, parsed.unit) || match.quantity;
+      // Bump have/bought back to to_buy — user has explicitly asked to buy more.
+      const nextState: ShoppingItemState =
+        match.state === "have" || match.state === "bought"
+          ? "to_buy"
+          : match.state;
+      const { error: updErr } = await supabase
+        .from("shopping_items")
+        .update({
+          quantity: mergedQuantity,
+          state: nextState,
+          unit_key: parsed.unit,
+        })
+        .eq("id", match.id);
+      if (updErr) return { ok: false, error: updErr.message };
+      const { error: srcErr } = await supabase.from("shopping_item_sources").insert({
+        shopping_item_id: match.id,
+        kind: "manual",
+        quantity: trimmed || null,
+      });
+      if (srcErr) return { ok: false, error: srcErr.message };
+      revalidatePath("/shopping");
+      return {
+        ok: true,
+        merged: true,
+        shoppingItemId: match.id,
+        quantity: mergedQuantity,
+        state: nextState,
+      };
+    }
+  }
+
   const { data: inserted, error } = await supabase
     .from("shopping_items")
     .insert({
@@ -135,6 +201,7 @@ export async function addManualItemAction(
       quantity: trimmed || null,
       source: "manual",
       state: "to_buy",
+      unit_key: parsed.unit ?? null,
     })
     .select("id")
     .single();
@@ -146,7 +213,13 @@ export async function addManualItemAction(
   });
   if (srcErr) return { ok: false, error: srcErr.message };
   revalidatePath("/shopping");
-  return { ok: true };
+  return {
+    ok: true,
+    merged: false,
+    shoppingItemId: inserted.id,
+    quantity: trimmed || null,
+    state: "to_buy",
+  };
 }
 
 // Add a one-off item that isn't an ingredient (blown light bulb, batteries).

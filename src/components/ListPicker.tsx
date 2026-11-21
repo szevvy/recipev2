@@ -24,6 +24,10 @@ export function ListPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  // "end" = right-0 (dropdown extends leftward from button) — the default;
+  // "start" = left-0 (extends rightward) — used when the button sits near
+  // the left edge of the viewport so the menu doesn't clip offscreen.
+  const [align, setAlign] = useState<"start" | "end">("end");
   const wrapRef = useRef<HTMLDivElement>(null);
   const draftRef = useRef<HTMLInputElement>(null);
 
@@ -47,6 +51,20 @@ export function ListPicker({
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
+  }, [open]);
+
+  // Decide which edge to anchor against each time the dropdown opens — if
+  // the right edge of the trigger is too close to the viewport's left side
+  // to fit the dropdown, flip to left-anchored (opens rightward instead).
+  useEffect(() => {
+    if (!open) return;
+    const el = wrapRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const DROPDOWN_WIDTH = 224; // w-56
+    const EDGE_MARGIN = 8;
+    const wouldClipLeft = rect.right - DROPDOWN_WIDTH < EDGE_MARGIN;
+    setAlign(wouldClipLeft ? "start" : "end");
   }, [open]);
 
   const normalizedLists = new Set(lists.map((l) => l.toLowerCase()));
@@ -103,7 +121,10 @@ export function ListPicker({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-lg py-1 z-30"
+          className={
+            "absolute top-full mt-1 w-56 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-lg py-1 z-30 " +
+            (align === "start" ? "left-0" : "right-0")
+          }
         >
           {options.length === 0 ? (
             <p className="px-3 py-2 text-xs italic text-[var(--muted)]">

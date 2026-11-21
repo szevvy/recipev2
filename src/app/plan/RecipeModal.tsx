@@ -83,13 +83,13 @@ export function RecipeModal({
         </div>
 
         <div className="flex-1 overflow-auto p-4">
-          {filtered.length === 0 && !onCustom ? (
+          {filtered.length === 0 ? (
             <div className="text-center py-12 text-[var(--muted)]">
               No recipes match &ldquo;{query}&rdquo;
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {onCustom && (
+              {onCustom && !q && (
                 <button
                   key="__custom"
                   type="button"

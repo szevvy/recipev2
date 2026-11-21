@@ -8,6 +8,7 @@ import {
   Clock,
   HelpCircle,
   Home,
+  Package,
   ShoppingBasket,
   Trash2,
 } from "lucide-react";
@@ -75,6 +76,8 @@ export function StatePicker({
   onChange,
   onRemove,
   canMake = false,
+  variant = "shopping",
+  onNeedMore,
 }: {
   state: ShoppingItemState;
   onChange: (next: PickState) => void;
@@ -82,6 +85,11 @@ export function StatePicker({
   // true when the backing ingredient has a linked_recipe_id — swaps the
   // Need-to-buy slot for Need-to-make.
   canMake?: boolean;
+  // "shopping" (default) shows Later in the fourth slot. "list" hides Later
+  // (doesn't make sense when reviewing staples/custom lists on the plan)
+  // and offers "Need to buy 2+" that opens a quantity picker via onNeedMore.
+  variant?: "shopping" | "list";
+  onNeedMore?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -97,7 +105,10 @@ export function StatePicker({
   }, []);
 
   const buyOrMake = canMake ? NEED_TO_MAKE : TO_BUY;
-  const OPTIONS: Option[] = [NOT_CHECKED, HAVE, buyOrMake, LATER];
+  const OPTIONS: Option[] =
+    variant === "list"
+      ? [NOT_CHECKED, HAVE, buyOrMake]
+      : [NOT_CHECKED, HAVE, buyOrMake, LATER];
 
   // When an item is bought, keep showing the buy/make chip (basket/chef) so
   // the picker always reflects a real option.
@@ -142,6 +153,23 @@ export function StatePicker({
               </li>
             );
           })}
+          {variant === "list" && onNeedMore && (
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  onNeedMore();
+                  setOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-[var(--accent-soft)]"
+              >
+                <Package size={14} className="text-[var(--accent)]" />
+                <span className="flex-1 text-[var(--foreground)]">
+                  Need to buy 2+…
+                </span>
+              </button>
+            </li>
+          )}
           {onRemove && (
             <li className="border-t border-[var(--border)]/60 mt-1 pt-1">
               <button

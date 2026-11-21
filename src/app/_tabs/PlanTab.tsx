@@ -63,10 +63,28 @@ export function PlanTab({ data }: { data: BootstrapData }) {
   // in any ingredient.lists gets its own section; Staples is special-cased
   // to appear first (and to show even when empty if the user is bootstrapping).
   const listSections = useMemo(() => {
+    // Find the per-ingredient "already on the shopping list" quantity —
+    // any active shopping_items row that has at least one non-staple source
+    // contributing. Shown as an italic hint next to list members so you
+    // don't double-flag something a meal already needs.
+    const onListByIngredient = new Map<string, string | null>();
     const stapleRowByIngredient = new Map<string, ShoppingItemWithIngredient>();
     for (const item of shoppingItems) {
-      if (item.source === "staple" && item.ingredient_id) {
+      if (!item.ingredient_id) continue;
+      if (item.source === "staple") {
         stapleRowByIngredient.set(item.ingredient_id, item);
+      }
+      if (
+        item.state === "not_checked" ||
+        item.state === "to_buy" ||
+        item.state === "later"
+      ) {
+        const hasNonStaple = item.shopping_item_sources.some(
+          (s) => s.kind !== "staple",
+        );
+        if (hasNonStaple) {
+          onListByIngredient.set(item.ingredient_id, item.quantity);
+        }
       }
     }
     const lastPurchasedByIngredient = new Map<string, string>();
@@ -83,6 +101,7 @@ export function PlanTab({ data }: { data: BootstrapData }) {
         state: stapleRowByIngredient.get(ing.id)?.state ?? "not_checked",
         last_purchased_at: lastPurchasedByIngredient.get(ing.id) ?? null,
         linked_recipe_id: ing.linked_recipe_id,
+        on_list_quantity: onListByIngredient.get(ing.id) ?? null,
       };
       for (const listName of ing.lists) {
         const bucket = membersByList.get(listName) ?? [];

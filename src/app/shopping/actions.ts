@@ -36,6 +36,7 @@ export async function setStapleStateAction(
   ingredientId: string,
   state: ShoppingItemState,
   rowId?: string,
+  quantity?: string | null,
 ): Promise<ActionResult> {
   if (
     !["not_checked", "to_buy", "have", "bought", "later", "need_to_make"].includes(
@@ -45,39 +46,95 @@ export async function setStapleStateAction(
     return { ok: false, error: "Invalid state" };
   }
   const supabase = supabaseAdmin();
+  const normalisedQty = quantity && quantity.trim() ? quantity.trim() : null;
 
-  const { data: existing } = await supabase
+  // Find any existing shopping_items row for this ingredient — the staple
+  // tick should merge into a meal/manual row rather than create a duplicate.
+  // Prefer the row that's already source=staple if one exists.
+  const { data: rows } = await supabase
     .from("shopping_items")
-    .select("id, state")
-    .eq("source", "staple")
+    .select("id, source, state, quantity, unit_key")
     .eq("ingredient_id", ingredientId)
-    .maybeSingle();
-
-  const previousState = existing?.state ?? null;
-  const previousId = existing?.id ?? null;
+    .is("unit_key", null);
+  const candidates = rows ?? [];
+  const stapleRow = candidates.find((r) => r.source === "staple") ?? null;
+  const target = stapleRow ?? candidates[0] ?? null;
 
   if (state === "not_checked") {
-    if (existing) {
-      // Sweep any recipe children we spawned before deleting the parent.
-      if (previousState === "need_to_make" && previousId) {
-        const sweepErr = await sweepRecipeChildren(supabase, previousId);
+    if (!target) return { ok: true };
+    const wasNeedToMake = target.state === "need_to_make";
+    // Drop the staple source row(s) attached to this target.
+    const { error: delSrcErr } = await supabase
+      .from("shopping_item_sources")
+      .delete()
+      .eq("shopping_item_id", target.id)
+      .eq("kind", "staple");
+    if (delSrcErr) return { ok: false, error: delSrcErr.message };
+    if (target.source === "staple") {
+      // Row was created from a staple tick — sweep recipe children first,
+      // then delete the parent itself.
+      if (wasNeedToMake) {
+        const sweepErr = await sweepRecipeChildren(supabase, target.id);
         if (sweepErr) return { ok: false, error: sweepErr };
       }
-      const { error } = await supabase.from("shopping_items").delete().eq("id", existing.id);
+      const { error } = await supabase.from("shopping_items").delete().eq("id", target.id);
       if (error) return { ok: false, error: error.message };
+    } else {
+      // Primary source is meal/manual — leave the row (and its state) alone.
+      // If it was need_to_make via a staple source, we also need to sweep.
+      if (wasNeedToMake) {
+        const sweepErr = await sweepRecipeChildren(supabase, target.id);
+        if (sweepErr) return { ok: false, error: sweepErr };
+        // Reset to to_buy since the staple was the thing that made it
+        // need_to_make — demote to a generic "buy it".
+        await supabase
+          .from("shopping_items")
+          .update({ state: "to_buy" })
+          .eq("id", target.id);
+      }
     }
-  } else if (existing) {
-    const { error } = await supabase
+    revalidatePath("/shopping");
+    return { ok: true };
+  }
+
+  if (target) {
+    const previousState = target.state as ShoppingItemState;
+    // Merge the staple's quantity into the parent (sum where parseable).
+    const newQuantity = mergeQuantities(target.quantity, normalisedQty);
+    const { error: updErr } = await supabase
       .from("shopping_items")
-      .update({ state })
-      .eq("id", existing.id);
-    if (error) return { ok: false, error: error.message };
-    // Handle recipe expansion / sweep on state transitions.
+      .update({ state, quantity: newQuantity })
+      .eq("id", target.id);
+    if (updErr) return { ok: false, error: updErr.message };
+
+    // Make sure a staple source row exists (idempotent).
+    const { data: existingStapleSrc } = await supabase
+      .from("shopping_item_sources")
+      .select("id")
+      .eq("shopping_item_id", target.id)
+      .eq("kind", "staple")
+      .maybeSingle();
+    if (!existingStapleSrc) {
+      const { error: srcErr } = await supabase
+        .from("shopping_item_sources")
+        .insert({
+          shopping_item_id: target.id,
+          kind: "staple",
+          quantity: normalisedQty,
+        });
+      if (srcErr) return { ok: false, error: srcErr.message };
+    } else if (normalisedQty) {
+      await supabase
+        .from("shopping_item_sources")
+        .update({ quantity: normalisedQty })
+        .eq("id", existingStapleSrc.id);
+    }
+
     if (previousState !== "need_to_make" && state === "need_to_make") {
-      const expandErr = await expandLinkedRecipe(supabase, ingredientId, existing.id);
+      const expandErr = await expandLinkedRecipe(supabase, ingredientId, target.id);
       if (expandErr) return { ok: false, error: expandErr };
     } else if (previousState === "need_to_make" && state !== "need_to_make") {
-      const sweepErr = await sweepRecipeChildren(supabase, existing.id);
+      const sweepErr = await sweepRecipeChildren(supabase, target.id);
       if (sweepErr) return { ok: false, error: sweepErr };
     }
   } else {
@@ -88,6 +145,7 @@ export async function setStapleStateAction(
         ingredient_id: ingredientId,
         source: "staple",
         state,
+        quantity: normalisedQty,
       })
       .select("id")
       .single();
@@ -95,6 +153,7 @@ export async function setStapleStateAction(
     const { error: srcErr } = await supabase.from("shopping_item_sources").insert({
       shopping_item_id: inserted.id,
       kind: "staple",
+      quantity: normalisedQty,
     });
     if (srcErr) return { ok: false, error: srcErr.message };
     if (state === "need_to_make") {
@@ -105,6 +164,17 @@ export async function setStapleStateAction(
 
   revalidatePath("/shopping");
   return { ok: true };
+}
+
+function mergeQuantities(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  const pa = parseQuantity(a);
+  const pb = parseQuantity(b);
+  if (pa.qty != null && pb.qty != null && pa.unit === pb.unit) {
+    return formatQuantity(pa.qty + pb.qty, pa.unit) || a;
+  }
+  return a; // Can't merge cleanly — preserve existing.
 }
 
 export async function setItemNotesAction(

@@ -16,6 +16,7 @@ import type {
 } from "@/lib/types";
 import { setStapleStateAction } from "@/app/shopping/actions";
 import { StatePicker } from "@/app/shopping/StatePicker";
+import { QuantityPickerModal } from "./QuantityPickerModal";
 
 export type ListMemberView = {
   ingredient_id: string;
@@ -24,6 +25,10 @@ export type ListMemberView = {
   state: ShoppingItemState;
   last_purchased_at: string | null;
   linked_recipe_id: string | null;
+  // Quantity currently on the shopping list from non-staple sources (meal,
+  // manual, recipe). Null when nothing else needs it. Shown as "1 already
+  // on list" so the user doesn't flag the same thing twice.
+  on_list_quantity: string | null;
 };
 
 // Terse "last bought" badge. Keeps the row scannable:
@@ -182,6 +187,7 @@ function ListMemberRow({
   chipText: string | null;
 }) {
   const [state, setState] = useState<ShoppingItemState>(item.state);
+  const [quantityModalOpen, setQuantityModalOpen] = useState(false);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const invalidate = useInvalidateBootstrap();
@@ -191,26 +197,44 @@ function ListMemberRow({
     setState(item.state);
   }, [item.state]);
 
-  function patchCache(next: ShoppingItemState, rowId: string) {
+  function patchCache(next: ShoppingItemState, rowId: string, qty: string | null) {
     // Mirror the server's insert/update/delete on the bootstrap cache so
     // every list + the shopping list re-derive instantly without a refetch.
     qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
       if (!old) return old;
       const existing = old.shoppingItems.find(
-        (i) => i.source === "staple" && i.ingredient_id === item.ingredient_id,
+        (i) =>
+          i.ingredient_id === item.ingredient_id &&
+          i.unit_key == null &&
+          (i.source === "staple" || i.state === "not_checked" || i.state === "to_buy" ||
+            i.state === "have" || i.state === "later" || i.state === "need_to_make"),
       );
       if (next === "not_checked") {
         if (!existing) return old;
+        if (existing.source === "staple") {
+          return {
+            ...old,
+            shoppingItems: old.shoppingItems.filter((i) => i.id !== existing.id),
+          };
+        }
+        // Non-staple primary — leave the row, just drop its state back if it
+        // was need_to_make.
         return {
           ...old,
-          shoppingItems: old.shoppingItems.filter((i) => i.id !== existing.id),
+          shoppingItems: old.shoppingItems.map((i) =>
+            i.id === existing.id && i.state === "need_to_make"
+              ? { ...i, state: "to_buy" as const }
+              : i,
+          ),
         };
       }
       if (existing) {
         return {
           ...old,
           shoppingItems: old.shoppingItems.map((i) =>
-            i.id === existing.id ? { ...i, state: next } : i,
+            i.id === existing.id
+              ? { ...i, state: next, quantity: qty ?? i.quantity }
+              : i,
           ),
         };
       }
@@ -219,7 +243,7 @@ function ListMemberRow({
         id: rowId,
         ingredient_id: item.ingredient_id,
         name: null,
-        quantity: null,
+        quantity: qty,
         source: "staple",
         source_ref: null,
         state: next,
@@ -243,15 +267,20 @@ function ListMemberRow({
     });
   }
 
-  function update(next: ShoppingItemState) {
-    if (next === state) return;
+  function update(next: ShoppingItemState, qty: string | null = null) {
+    if (next === state && !qty) return;
     const previous = state;
     const rowId = typeof crypto !== "undefined" ? crypto.randomUUID() : "";
     setState(next);
-    patchCache(next, rowId);
+    patchCache(next, rowId, qty);
     setError(null);
     startTransition(async () => {
-      const result = await setStapleStateAction(item.ingredient_id, next, rowId);
+      const result = await setStapleStateAction(
+        item.ingredient_id,
+        next,
+        rowId,
+        qty,
+      );
       if (!result.ok) {
         setState(previous);
         setError(result.error);
@@ -261,9 +290,9 @@ function ListMemberRow({
     });
   }
 
-  // Have / later (deferred) / bought rows are muted — the user has already
-  // made a decision on them, so they should fade into the background.
-  const dimmed = state === "have" || state === "later" || state === "bought";
+  // Have / bought rows are muted — the user has already made a decision.
+  // Later doesn't exist in the list variant.
+  const dimmed = state === "have" || state === "bought";
   const nameStyle = chipText
     ? { color: `${chipText}${dimmed ? "80" : "d9"}` }
     : dimmed
@@ -283,6 +312,11 @@ function ListMemberRow({
         style={nameStyle}
       >
         {item.name}
+        {item.on_list_quantity && (
+          <span className="ml-1.5 text-[10px] italic text-[var(--muted)]">
+            {item.on_list_quantity} already on list
+          </span>
+        )}
       </span>
       {lastBought && (
         <span
@@ -296,8 +330,20 @@ function ListMemberRow({
       {error && <span className="text-xs text-red-600">{error}</span>}
       <StatePicker
         state={state}
-        onChange={update}
+        onChange={(next) => update(next)}
         canMake={!!item.linked_recipe_id}
+        variant="list"
+        onNeedMore={() => setQuantityModalOpen(true)}
+      />
+      <QuantityPickerModal
+        open={quantityModalOpen}
+        itemName={item.name}
+        defaultQuantity={2}
+        onPick={(n) => {
+          setQuantityModalOpen(false);
+          update("to_buy", String(n));
+        }}
+        onClose={() => setQuantityModalOpen(false)}
       />
     </li>
   );

@@ -47,8 +47,11 @@ function formatLastPurchased(iso: string): string {
   if (days <= 0) return "today";
   if (days === 1) return "yest";
   if (days < 7) return `${days}d`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 4) return `${weeks}w`;
+  if (days < 28) {
+    const weeks = Math.floor(days / 7);
+    const rem = days % 7;
+    return rem > 0 ? `${weeks}w ${rem}d` : `${weeks}w`;
+  }
   const months = Math.floor(days / 30);
   if (months < 12) return `${months}mo`;
   const years = Math.floor(days / 365);

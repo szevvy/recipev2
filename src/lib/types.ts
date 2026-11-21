@@ -116,6 +116,7 @@ export type ShoppingItemSourceRow = {
 export type ShoppingItemSourceDetail = ShoppingItemSourceRow & {
   meal_plan: {
     date: string;
+    custom_name: string | null;
     recipes: Pick<Recipe, "id" | "name"> | null;
   } | null;
 };

@@ -261,7 +261,9 @@ function SourceIcon({ kind }: { kind: "meal" | "staple" | "manual" }) {
 function sourceLabel(s: ShoppingItemWithIngredient["shopping_item_sources"][number]): string {
   if (s.kind === "staple") return "from staples";
   if (s.kind === "manual") return "manually added";
-  const name = s.meal_plan?.recipes?.name;
+  // Custom meals have no `recipes` row — their title lives on
+  // meal_plan.custom_name. Fall back to that when the recipe is absent.
+  const name = s.meal_plan?.recipes?.name ?? s.meal_plan?.custom_name ?? null;
   const dateIso = s.meal_plan?.date;
   const day = dateIso ? format(parseISO(dateIso), "EEE d MMM") : null;
   if (name && day) return `from ${name} (${day})`;

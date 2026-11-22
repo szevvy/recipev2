@@ -25,7 +25,8 @@ import {
   setItemStateAction,
 } from "./actions";
 import { StatePicker } from "./StatePicker";
-import { PriceChips, usePriceChipsFor } from "@/components/PriceChips";
+import { usePriceChipsFor } from "@/components/PriceChips";
+import { IngredientPricesDetail } from "@/components/IngredientPricesDetail";
 
 export type RowAccent = { chipBg: string; chipText: string } | null;
 
@@ -325,6 +326,15 @@ function ExpandedPanel({ item }: { item: ShoppingItemWithIngredient }) {
           </ul>
         )}
       </div>
+
+      {item.ingredients?.id && (
+        <div>
+          <span className="text-[10px] uppercase tracking-wide text-[var(--muted)] block mb-1">
+            Prices
+          </span>
+          <IngredientPricesDetail ingredientId={item.ingredients.id} />
+        </div>
+      )}
     </div>
   );
 }

@@ -8,6 +8,10 @@ type Chip = {
   retailer: Retailer;
   icon: string;
   priceLabel: string;
+  // Non-empty when the retailer has more than one SKU — tells the user
+  // which specific variant the chip's price is quoting (e.g. "Salmon
+  // Skin On" when there are two salmon SKUs).
+  variantHint: string | null;
   cheapest: boolean;
   outOfStock: boolean;
   onSale: boolean;
@@ -50,6 +54,8 @@ export function usePriceChipsFor(ingredientId: string | null): Chip[] {
     bestUnitCents: number | null;
     bestUnitOfMeasure: string | null;
     bestPackCents: number | null;
+    bestVariantTitle: string | null;
+    variantCount: number;
     onSale: boolean;
     outOfStock: boolean;
     titleLines: string[];
@@ -99,6 +105,8 @@ export function usePriceChipsFor(ingredientId: string | null): Chip[] {
       bestUnitCents: bestVariant?.unit_price_cents ?? null,
       bestUnitOfMeasure: bestVariant?.unit_of_measure ?? null,
       bestPackCents: bestVariant?.price_cents ?? null,
+      bestVariantTitle: bestVariant?.product_title ?? null,
+      variantCount: bucket.length,
       onSale: !!bestVariant?.on_sale,
       outOfStock: !bestVariant,
       titleLines,
@@ -148,6 +156,8 @@ export function usePriceChipsFor(ingredientId: string | null): Chip[] {
         retailer: p.retailer,
         icon: RETAILER_ICON[p.retailer],
         priceLabel,
+        variantHint:
+          p.variantCount > 1 && p.bestVariantTitle ? p.bestVariantTitle : null,
         cheapest,
         outOfStock: p.outOfStock,
         onSale: p.onSale,
@@ -194,6 +204,11 @@ export function PriceChips({
             <span className="line-through">OOS</span>
           ) : (
             <span>{c.priceLabel}</span>
+          )}
+          {c.variantHint && !c.outOfStock && (
+            <span className="italic text-[var(--muted)] truncate max-w-[12ch]">
+              · {c.variantHint}
+            </span>
           )}
           {c.onSale && !c.outOfStock && (
             <span className="text-[9px] uppercase tracking-wide text-[var(--sage)]">

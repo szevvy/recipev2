@@ -8,6 +8,7 @@ import { ListPicker } from "@/components/ListPicker";
 import { LinkedRecipePicker } from "@/components/LinkedRecipePicker";
 import { GroupCombobox } from "@/components/GroupCombobox";
 import { PriceChips } from "@/components/PriceChips";
+import { IngredientPricesDetail } from "@/components/IngredientPricesDetail";
 import {
   BOOTSTRAP_KEY,
   useInvalidateBootstrap,
@@ -37,6 +38,7 @@ export function IngredientRow({
   recipes: RecipeOption[];
 }) {
   const [editing, setEditing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [editLists, setEditLists] = useState<string[]>(ingredient.lists);
   const [editLinkedRecipeId, setEditLinkedRecipeId] = useState<string | null>(
     ingredient.linked_recipe_id,
@@ -295,42 +297,69 @@ export function IngredientRow({
     );
   }
 
+  const hasAnyCode =
+    ingredient.retailer_codes.coles.length > 0 ||
+    ingredient.retailer_codes.woolworths.length > 0 ||
+    ingredient.retailer_codes.aldi.length > 0;
+
   return (
-    <li className="flex items-center gap-2 rounded-lg hover:bg-[var(--surface-muted)] px-2 py-1.5 transition-colors">
-      <ListPicker
-        lists={ingredient.lists}
-        knownLists={knownLists}
-        onToggle={onListToggle}
-      />
-      <div className="flex-1 min-w-0">
-        <div className="font-medium text-[var(--foreground)] truncate flex items-center gap-1">
-          <span className="truncate">{ingredient.name}</span>
-          {ingredient.linked_recipe_id && (
-            <ChefHat
-              size={12}
-              className="text-[var(--accent)] shrink-0"
-              aria-label="Make from recipe"
-            />
-          )}
-        </div>
-        <PriceChips ingredientId={ingredient.id} size="sm" />
+    <li
+      className={
+        "rounded-lg transition-colors " +
+        (expanded
+          ? "bg-[var(--surface-muted)]"
+          : "hover:bg-[var(--surface-muted)]")
+      }
+    >
+      <div className="flex items-center gap-2 px-2 py-1.5">
+        <ListPicker
+          lists={ingredient.lists}
+          knownLists={knownLists}
+          onToggle={onListToggle}
+        />
+        <button
+          type="button"
+          onClick={() => hasAnyCode && setExpanded((e) => !e)}
+          className={
+            "flex-1 min-w-0 text-left " +
+            (hasAnyCode ? "cursor-pointer" : "cursor-default")
+          }
+          aria-expanded={expanded}
+        >
+          <div className="font-medium text-[var(--foreground)] truncate flex items-center gap-1">
+            <span className="truncate">{ingredient.name}</span>
+            {ingredient.linked_recipe_id && (
+              <ChefHat
+                size={12}
+                className="text-[var(--accent)] shrink-0"
+                aria-label="Make from recipe"
+              />
+            )}
+          </div>
+          <PriceChips ingredientId={ingredient.id} size="sm" />
+        </button>
+        {error && <span className="text-xs text-red-600 mr-1">{error}</span>}
+        <button
+          onClick={openEdit}
+          title="Edit"
+          className="p-1.5 rounded-full text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--accent-soft)] transition-colors"
+        >
+          <Pencil size={16} />
+        </button>
+        <button
+          onClick={onDelete}
+          disabled={pending}
+          title="Delete"
+          className="p-1.5 rounded-full text-[var(--muted)] hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+        >
+          <Trash2 size={16} />
+        </button>
       </div>
-      {error && <span className="text-xs text-red-600 mr-1">{error}</span>}
-      <button
-        onClick={openEdit}
-        title="Edit"
-        className="p-1.5 rounded-full text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--accent-soft)] transition-colors"
-      >
-        <Pencil size={16} />
-      </button>
-      <button
-        onClick={onDelete}
-        disabled={pending}
-        title="Delete"
-        className="p-1.5 rounded-full text-[var(--muted)] hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-      >
-        <Trash2 size={16} />
-      </button>
+      {expanded && (
+        <div className="px-3 pb-3 pt-1 border-t border-[var(--border)]/60">
+          <IngredientPricesDetail ingredientId={ingredient.id} />
+        </div>
+      )}
     </li>
   );
 }

@@ -179,5 +179,32 @@ export type WeekStart = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type AppSettings = {
   id: number;
   week_starts_on: WeekStart;
+  // Four-digit Australian postcode passed to the price-scraping actor so
+  // returned prices reflect the user's nearest store. Null until set.
+  postcode: string | null;
   updated_at: string;
+};
+
+export type Retailer = "coles" | "woolworths" | "aldi";
+
+export type IngredientRetailerCode = {
+  ingredient_id: string;
+  retailer: Retailer;
+  stock_code: string;
+  created_at: string;
+};
+
+export type IngredientPrice = {
+  ingredient_id: string;
+  retailer: Retailer;
+  price_cents: number | null;
+  regular_price_cents: number | null;
+  on_sale: boolean;
+  in_stock: boolean;
+  unit_price_text: string | null;
+  product_title: string | null;
+  product_url: string | null;
+  image_url: string | null;
+  promo_text: string | null;
+  fetched_at: string;
 };

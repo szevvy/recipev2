@@ -3,6 +3,7 @@ import { getSettings } from "@/lib/settings";
 import { supabaseAdmin } from "@/lib/supabase";
 import type { CategoryMetaRow, Ingredient } from "@/lib/types";
 import { CategoryManager, type CategoryRow } from "./CategoryManager";
+import { PostcodeInput } from "./PostcodeInput";
 import { RebuildPantryButton } from "./RebuildPantryButton";
 import { WeekStartPicker } from "./WeekStartPicker";
 
@@ -62,6 +63,18 @@ export default async function SettingsPage() {
             </p>
           </div>
           <WeekStartPicker initial={settings.week_starts_on} />
+        </section>
+
+        <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-3">
+          <div>
+            <h2 className="font-serif text-xl text-[var(--foreground)]">Postcode</h2>
+            <p className="text-xs text-[var(--muted)] mt-0.5">
+              Four-digit Australian postcode used when pulling prices from
+              Coles / Woolworths / ALDI, so the prices reflect your nearest
+              store.
+            </p>
+          </div>
+          <PostcodeInput initial={settings.postcode} />
         </section>
 
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-3">

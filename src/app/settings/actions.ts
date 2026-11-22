@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { updateWeekStart } from "@/lib/settings";
+import { updatePostcode, updateWeekStart } from "@/lib/settings";
 import type { WeekStart } from "@/lib/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -14,6 +14,21 @@ export async function setWeekStartAction(day: number): Promise<ActionResult> {
     await updateWeekStart(day as WeekStart);
     revalidatePath("/settings");
     revalidatePath("/plan");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+export async function setPostcodeAction(raw: string): Promise<ActionResult> {
+  const trimmed = raw.trim();
+  // Empty is allowed (clears the setting); anything non-empty must be 4 digits.
+  if (trimmed && !/^\d{4}$/.test(trimmed)) {
+    return { ok: false, error: "Enter a 4-digit postcode (or leave blank)" };
+  }
+  try {
+    await updatePostcode(trimmed);
+    revalidatePath("/settings");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Unknown error" };

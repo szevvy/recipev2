@@ -3,11 +3,14 @@ import type {
   CategoryMetaRow,
   Ingredient,
   IngredientListMembership,
+  IngredientPrice,
+  IngredientRetailerCode,
   MealPlanCustomIngredient,
   MealPlanEntry,
   PurchaseHistoryRow,
   Recipe,
   RecipeIngredient,
+  Retailer,
   ShoppingItem,
   ShoppingItemSource,
   ShoppingItemSourceKind,
@@ -74,6 +77,48 @@ export type Database = {
         Update: { list_name?: string };
         Relationships: [];
       };
+      ingredient_retailer_codes: {
+        Row: IngredientRetailerCode;
+        Insert: {
+          ingredient_id: string;
+          retailer: Retailer;
+          stock_code: string;
+        };
+        Update: {
+          stock_code?: string;
+        };
+        Relationships: [];
+      };
+      ingredient_prices: {
+        Row: IngredientPrice;
+        Insert: {
+          ingredient_id: string;
+          retailer: Retailer;
+          price_cents?: number | null;
+          regular_price_cents?: number | null;
+          on_sale?: boolean;
+          in_stock?: boolean;
+          unit_price_text?: string | null;
+          product_title?: string | null;
+          product_url?: string | null;
+          image_url?: string | null;
+          promo_text?: string | null;
+          fetched_at?: string;
+        };
+        Update: {
+          price_cents?: number | null;
+          regular_price_cents?: number | null;
+          on_sale?: boolean;
+          in_stock?: boolean;
+          unit_price_text?: string | null;
+          product_title?: string | null;
+          product_url?: string | null;
+          image_url?: string | null;
+          promo_text?: string | null;
+          fetched_at?: string;
+        };
+        Relationships: [];
+      };
       recipes: {
         Row: Recipe;
         Insert: RecipeInsert;
@@ -88,8 +133,15 @@ export type Database = {
       };
       app_settings: {
         Row: AppSettings;
-        Insert: { id?: number; week_starts_on?: WeekStart };
-        Update: { week_starts_on?: WeekStart };
+        Insert: {
+          id?: number;
+          week_starts_on?: WeekStart;
+          postcode?: string | null;
+        };
+        Update: {
+          week_starts_on?: WeekStart;
+          postcode?: string | null;
+        };
         Relationships: [];
       };
       meal_plan: {

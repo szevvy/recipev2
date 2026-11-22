@@ -14,10 +14,19 @@ export default async function SettingsPage() {
   const settings = await getSettings();
 
   const supabase = supabaseAdmin();
-  const [ingredientsResp, metaResp] = await Promise.all([
+  const [ingredientsResp, metaResp, latestPriceResp] = await Promise.all([
     supabase.from("ingredients").select("group_name"),
     supabase.from("category_meta").select("*"),
+    supabase
+      .from("ingredient_prices")
+      .select("fetched_at")
+      .order("fetched_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
+  const lastRefreshedAt =
+    (latestPriceResp.data as { fetched_at: string | null } | null)?.fetched_at ??
+    null;
 
   const ingredientsErr = ingredientsResp.error;
   const metaErr = metaResp.error;
@@ -88,7 +97,7 @@ export default async function SettingsPage() {
               Needs <code>APIFY_TOKEN</code> set in Vercel env.
             </p>
           </div>
-          <RefreshPricesButton />
+          <RefreshPricesButton initialLastRefreshedAt={lastRefreshedAt} />
         </section>
 
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-3">

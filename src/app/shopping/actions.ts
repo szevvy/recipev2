@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
 import { syncShoppingList } from "@/lib/shopping-sync";
 import { formatQuantity, parseQuantity } from "@/lib/quantity";
@@ -24,7 +23,6 @@ export type AddManualItemResult =
 export async function syncShoppingListAction(): Promise<ActionResult> {
   const result = await syncShoppingList();
   if (!result.ok) return result;
-  revalidatePath("/shopping");
   return { ok: true };
 }
 
@@ -93,7 +91,6 @@ export async function setStapleStateAction(
           .eq("id", target.id);
       }
     }
-    revalidatePath("/shopping");
     return { ok: true };
   }
 
@@ -162,7 +159,6 @@ export async function setStapleStateAction(
     }
   }
 
-  revalidatePath("/shopping");
   return { ok: true };
 }
 
@@ -187,7 +183,6 @@ export async function setItemNotesAction(
     .update({ notes: trimmed || null })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/shopping");
   return { ok: true };
 }
 
@@ -238,7 +233,6 @@ export async function setItemStateAction(
     if (sweepErr) return { ok: false, error: sweepErr };
   }
 
-  revalidatePath("/shopping");
   return { ok: true };
 }
 
@@ -425,7 +419,6 @@ export async function clearHaveItemsAction(): Promise<ActionResult> {
     }
   }
 
-  revalidatePath("/shopping");
   return { ok: true };
 }
 
@@ -478,7 +471,6 @@ export async function addManualItemAction(
         quantity: trimmed || null,
       });
       if (srcErr) return { ok: false, error: srcErr.message };
-      revalidatePath("/shopping");
       return {
         ok: true,
         merged: true,
@@ -508,7 +500,6 @@ export async function addManualItemAction(
     quantity: trimmed || null,
   });
   if (srcErr) return { ok: false, error: srcErr.message };
-  revalidatePath("/shopping");
   return {
     ok: true,
     merged: false,
@@ -547,7 +538,6 @@ export async function addOneOffItemAction(
     quantity: trimmedQty || null,
   });
   if (srcErr) return { ok: false, error: srcErr.message };
-  revalidatePath("/shopping");
   return { ok: true };
 }
 
@@ -623,6 +613,5 @@ export async function finishShoppingAction(): Promise<ActionResult> {
     .gte("date", today);
   if (stampErr) return { ok: false, error: stampErr.message };
 
-  revalidatePath("/shopping");
   return { ok: true };
 }

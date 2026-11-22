@@ -42,7 +42,6 @@ export async function setCategoryColorAction(
   }
 
   revalidatePath("/settings");
-  revalidatePath("/shopping");
   return { ok: true };
 }
 
@@ -56,6 +55,5 @@ export async function setCategoryOrderAction(
     .upsert(rows, { onConflict: "name" });
   if (error) return { ok: false, error: error.message };
   revalidatePath("/settings");
-  revalidatePath("/shopping");
   return { ok: true };
 }

@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase";
 import { parseIngredientForm } from "@/lib/validation";
@@ -64,7 +63,6 @@ export async function createIngredientAction(fd: FormData): Promise<ActionResult
         .insert(retailerRows);
       if (codesErr) return { ok: false, error: codesErr.message };
     }
-    revalidatePath("/ingredients");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: toError(err) };
@@ -157,7 +155,6 @@ export async function updateIngredientAction(id: string, fd: FormData): Promise<
         if (delPriceErr) return { ok: false, error: delPriceErr.message };
       }
     }
-    revalidatePath("/ingredients");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: toError(err) };
@@ -172,7 +169,6 @@ export async function deleteIngredientAction(id: string): Promise<ActionResult> 
     }
     return { ok: false, error: error.message };
   }
-  revalidatePath("/ingredients");
   return { ok: true };
 }
 

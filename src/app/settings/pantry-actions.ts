@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
 import {
   formatQuantity,
@@ -246,7 +245,5 @@ export async function rebuildPantryFromShoppedMealsAction(): Promise<RebuildResu
     }
   }
 
-  revalidatePath("/shopping");
-  revalidatePath("/plan");
   return { ok: true, added };
 }

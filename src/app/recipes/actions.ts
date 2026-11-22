@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase";
 import {
@@ -129,8 +128,6 @@ export async function createRecipeAction(
         return { ok: false, error: `Failed to save ingredients: ${rowErr.message}` };
       }
     }
-    revalidatePath("/recipes");
-    revalidatePath("/ingredients");
     return { ok: true, id: recipe.id };
   } catch (err) {
     return { ok: false, error: toError(err) };
@@ -190,9 +187,6 @@ export async function updateRecipeAction(
       }
     }
 
-    revalidatePath("/recipes");
-    revalidatePath("/ingredients");
-    revalidatePath(`/recipes/${id}`);
     return { ok: true };
   } catch (err) {
     return { ok: false, error: toError(err) };
@@ -202,7 +196,6 @@ export async function updateRecipeAction(
 export async function deleteRecipeAction(id: string): Promise<ActionResult> {
   const { error } = await supabaseAdmin().from("recipes").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/recipes");
   return { ok: true };
 }
 
@@ -232,6 +225,5 @@ export async function quickCreateIngredientAction(
     return { ok: false, error: error.message };
   }
 
-  revalidatePath("/ingredients");
   return { ok: true, ingredient: data as unknown as Ingredient };
 }

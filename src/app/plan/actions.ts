@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
 import { syncShoppingList } from "@/lib/shopping-sync";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -51,7 +50,6 @@ export async function setMealIngredientStateAction(
         .eq("meal_plan_id", mealPlanId);
       if (delSrcErr) return { ok: false, error: delSrcErr.message };
     }
-    revalidatePath("/shopping");
     return { ok: true };
   }
 
@@ -99,7 +97,6 @@ export async function setMealIngredientStateAction(
     if (srcErr) return { ok: false, error: srcErr.message };
   }
 
-  revalidatePath("/shopping");
   return { ok: true };
 }
 
@@ -183,7 +180,6 @@ export async function setMealAction(
     if (!sync.ok) return sync;
     const cleanupErr = await cleanupOrphanMealItems(supabase);
     if (cleanupErr) return { ok: false, error: cleanupErr };
-    revalidatePath("/shopping");
   }
 
   return { ok: true };
@@ -317,7 +313,6 @@ export async function setCustomMealAction(
     if (srcErr) return { ok: false, error: srcErr.message };
   }
 
-  revalidatePath("/shopping");
   return { ok: true };
 }
 
@@ -368,7 +363,6 @@ export async function clearMealAction(
   if (removeIngredients) {
     const cleanupErr = await cleanupOrphanMealItems(supabase);
     if (cleanupErr) return { ok: false, error: cleanupErr };
-    revalidatePath("/shopping");
   }
 
   return { ok: true };

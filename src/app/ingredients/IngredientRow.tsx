@@ -7,6 +7,7 @@ import type { Ingredient, Recipe } from "@/lib/types";
 import { ListPicker } from "@/components/ListPicker";
 import { LinkedRecipePicker } from "@/components/LinkedRecipePicker";
 import { GroupCombobox } from "@/components/GroupCombobox";
+import { PriceChips } from "@/components/PriceChips";
 import {
   BOOTSTRAP_KEY,
   useInvalidateBootstrap,
@@ -299,6 +300,7 @@ export function IngredientRow({
             />
           )}
         </div>
+        <PriceChips ingredientId={ingredient.id} size="sm" />
       </div>
       {error && <span className="text-xs text-red-600 mr-1">{error}</span>}
       <button

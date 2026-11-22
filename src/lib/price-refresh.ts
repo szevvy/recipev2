@@ -217,6 +217,8 @@ export async function refreshPrices(): Promise<RefreshResult> {
     regular_price_cents: number | null;
     on_sale: boolean;
     in_stock: boolean;
+    unit_price_cents: number | null;
+    unit_of_measure: string | null;
     unit_price_text: string | null;
     product_title: string | null;
     product_url: string | null;
@@ -233,6 +235,18 @@ export async function refreshPrices(): Promise<RefreshResult> {
     const inStock =
       isProduct && (match?.inStock ?? true) !== false;
     if (!inStock) outOfStock++;
+    const unitPriceCents =
+      isProduct && match?.unitPrice != null
+        ? toCents(match.unitPrice as number)
+        : null;
+    // actor emits "1kg" / "100g" / "1L" etc. — normalise to a lowercase
+    // key that drops the leading "1" so the display + comparator can
+    // group by "kg" vs "100g" directly.
+    const rawUnitOfMeasure =
+      isProduct && match?.unitOfMeasure ? String(match.unitOfMeasure) : null;
+    const unitOfMeasure = rawUnitOfMeasure
+      ? rawUnitOfMeasure.replace(/^1\s*/i, "").trim().toLowerCase()
+      : null;
     upserts.push({
       ingredient_id: ref.ingredient_id,
       retailer: ref.retailer,
@@ -241,9 +255,11 @@ export async function refreshPrices(): Promise<RefreshResult> {
       regular_price_cents: isProduct ? toCents(match?.regularPrice ?? null) : null,
       on_sale: !!(isProduct && match?.onSale),
       in_stock: inStock,
+      unit_price_cents: unitPriceCents,
+      unit_of_measure: unitOfMeasure,
       unit_price_text:
-        isProduct && match?.unitPrice != null
-          ? `$${(match.unitPrice as number).toFixed(2)}/${match?.unitOfMeasure ?? ""}`.trim()
+        unitPriceCents != null && unitOfMeasure
+          ? `$${(unitPriceCents / 100).toFixed(2)}/${unitOfMeasure}`
           : null,
       product_title: isProduct ? match?.title ?? null : null,
       product_url: isProduct ? match?.url ?? null : null,

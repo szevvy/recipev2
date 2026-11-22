@@ -34,18 +34,22 @@ export function usePriceChipsFor(ingredientId: string | null): Chip[] {
   );
   if (prices.length === 0) return [];
 
-  // Group by retailer and collapse variants: one chip per retailer that
-  // reflects the cheapest in-stock variant. Tooltip enumerates every
-  // variant we tracked.
+  // Group by retailer and collapse variants: one chip per retailer. We
+  // prefer unit price ($/kg etc.) for cheapest decisions so a smaller
+  // pack doesn't fake a win over a larger one. Falls back to pack price
+  // when no unit price is available.
   const byRetailer = new Map<Retailer, typeof prices>();
   for (const p of prices) {
     const bucket = byRetailer.get(p.retailer) ?? [];
     bucket.push(p);
     byRetailer.set(p.retailer, bucket);
   }
+
   type Pricing = {
     retailer: Retailer;
-    best: number | null;
+    bestUnitCents: number | null;
+    bestUnitOfMeasure: string | null;
+    bestPackCents: number | null;
     onSale: boolean;
     outOfStock: boolean;
     titleLines: string[];
@@ -55,19 +59,26 @@ export function usePriceChipsFor(ingredientId: string | null): Chip[] {
     const inStock = bucket.filter(
       (p) => p.in_stock && p.price_cents != null,
     );
-    const best =
-      inStock.length > 0
-        ? Math.min(...inStock.map((p) => p.price_cents as number))
-        : null;
-    // Chip sale tag only if the cheapest variant is on sale — sales from
-    // a more expensive variant shouldn't claim the whole chip.
+    // Pick the cheapest variant by unit price (when available). Fall back
+    // to pack price for variants / retailers that don't publish one.
     const bestVariant =
-      inStock.find((p) => p.price_cents === best) ?? null;
+      inStock.length === 0
+        ? null
+        : inStock
+            .slice()
+            .sort((a, b) => {
+              const au = a.unit_price_cents ?? Number.MAX_SAFE_INTEGER;
+              const bu = b.unit_price_cents ?? Number.MAX_SAFE_INTEGER;
+              if (au !== bu) return au - bu;
+              const ap = a.price_cents ?? Number.MAX_SAFE_INTEGER;
+              const bp = b.price_cents ?? Number.MAX_SAFE_INTEGER;
+              return ap - bp;
+            })[0] ?? null;
     const titleLines = bucket
       .slice()
       .sort((a, b) => {
-        const av = a.price_cents ?? Number.MAX_SAFE_INTEGER;
-        const bv = b.price_cents ?? Number.MAX_SAFE_INTEGER;
+        const av = a.unit_price_cents ?? a.price_cents ?? Number.MAX_SAFE_INTEGER;
+        const bv = b.unit_price_cents ?? b.price_cents ?? Number.MAX_SAFE_INTEGER;
         return av - bv;
       })
       .map((p) => {
@@ -75,41 +86,77 @@ export function usePriceChipsFor(ingredientId: string | null): Chip[] {
         if (!p.in_stock || p.price_cents == null) {
           return `${title} — out of stock`;
         }
-        const price = `$${(p.price_cents / 100).toFixed(2)}`;
+        const pack = `$${(p.price_cents / 100).toFixed(2)}`;
+        const unit =
+          p.unit_price_cents != null && p.unit_of_measure
+            ? ` · $${(p.unit_price_cents / 100).toFixed(2)}/${p.unit_of_measure}`
+            : "";
         const sale = p.on_sale ? " (sale)" : "";
-        const unit = p.unit_price_text ? ` · ${p.unit_price_text}` : "";
-        return `${title} — ${price}${sale}${unit}`;
+        return `${title} — ${pack}${unit}${sale}`;
       });
     pricings.push({
       retailer,
-      best,
+      bestUnitCents: bestVariant?.unit_price_cents ?? null,
+      bestUnitOfMeasure: bestVariant?.unit_of_measure ?? null,
+      bestPackCents: bestVariant?.price_cents ?? null,
       onSale: !!bestVariant?.on_sale,
-      outOfStock: best == null,
+      outOfStock: !bestVariant,
       titleLines,
     });
   }
 
-  const cheapestAcross =
-    pricings
-      .map((p) => p.best)
-      .filter((v): v is number => v != null)
-      .reduce<number | null>((acc, v) => (acc == null || v < acc ? v : acc), null);
+  // Across retailers, only call a "cheapest" winner when the comparison
+  // is honest — either every in-stock retailer publishes a unit price in
+  // the SAME unit_of_measure, or none do and we fall back to pack price.
+  const inStockChips = pricings.filter((p) => !p.outOfStock);
+  const allHaveUnit = inStockChips.every(
+    (p) => p.bestUnitCents != null && p.bestUnitOfMeasure != null,
+  );
+  const sharedUom =
+    allHaveUnit &&
+    inStockChips.every(
+      (p) => p.bestUnitOfMeasure === inStockChips[0]?.bestUnitOfMeasure,
+    );
+  const cheapestUnit =
+    sharedUom && inStockChips.length > 0
+      ? Math.min(...inStockChips.map((p) => p.bestUnitCents as number))
+      : null;
+  const cheapestPack =
+    cheapestUnit == null && inStockChips.length > 0
+      ? inStockChips
+          .map((p) => p.bestPackCents)
+          .filter((v): v is number => v != null)
+          .reduce<number | null>((acc, v) => (acc == null || v < acc ? v : acc), null)
+      : null;
 
   return pricings
     .slice()
     .sort((a, b) => a.retailer.localeCompare(b.retailer))
-    .map((p) => ({
-      retailer: p.retailer,
-      icon: RETAILER_ICON[p.retailer],
-      priceLabel: p.best != null ? `$${(p.best / 100).toFixed(2)}` : "—",
-      cheapest: !p.outOfStock && cheapestAcross != null && p.best === cheapestAcross,
-      outOfStock: p.outOfStock,
-      onSale: p.onSale,
-      title:
-        p.titleLines.length > 1
-          ? `${RETAILER_LABEL[p.retailer]}:\n${p.titleLines.join("\n")}`
-          : p.titleLines[0] ?? RETAILER_LABEL[p.retailer],
-    }));
+    .map((p) => {
+      // Primary chip label: unit price when we've got one, pack price otherwise.
+      const priceLabel =
+        p.bestUnitCents != null && p.bestUnitOfMeasure
+          ? `$${(p.bestUnitCents / 100).toFixed(2)}/${p.bestUnitOfMeasure}`
+          : p.bestPackCents != null
+          ? `$${(p.bestPackCents / 100).toFixed(2)}`
+          : "—";
+      const cheapest =
+        !p.outOfStock &&
+        ((cheapestUnit != null && p.bestUnitCents === cheapestUnit) ||
+          (cheapestPack != null && p.bestPackCents === cheapestPack));
+      return {
+        retailer: p.retailer,
+        icon: RETAILER_ICON[p.retailer],
+        priceLabel,
+        cheapest,
+        outOfStock: p.outOfStock,
+        onSale: p.onSale,
+        title:
+          p.titleLines.length > 1
+            ? `${RETAILER_LABEL[p.retailer]}:\n${p.titleLines.join("\n")}`
+            : p.titleLines[0] ?? RETAILER_LABEL[p.retailer],
+      };
+    });
 }
 
 export function PriceChips({

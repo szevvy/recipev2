@@ -203,10 +203,16 @@ export type IngredientPrice = {
   ingredient_id: string;
   retailer: Retailer;
   stock_code: string;
+  // Pack price in cents (what shows on the price tag).
   price_cents: number | null;
   regular_price_cents: number | null;
   on_sale: boolean;
   in_stock: boolean;
+  // Unit price in cents, keyed against unit_of_measure (e.g. 4800 +
+  // "1kg" = $48/kg). Lets us compare apples-to-apples across pack
+  // sizes and retailers.
+  unit_price_cents: number | null;
+  unit_of_measure: string | null;
   unit_price_text: string | null;
   product_title: string | null;
   product_url: string | null;

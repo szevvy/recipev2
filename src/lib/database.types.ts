@@ -99,6 +99,8 @@ export type Database = {
           regular_price_cents?: number | null;
           on_sale?: boolean;
           in_stock?: boolean;
+          unit_price_cents?: number | null;
+          unit_of_measure?: string | null;
           unit_price_text?: string | null;
           product_title?: string | null;
           product_url?: string | null;
@@ -111,6 +113,8 @@ export type Database = {
           regular_price_cents?: number | null;
           on_sale?: boolean;
           in_stock?: boolean;
+          unit_price_cents?: number | null;
+          unit_of_measure?: string | null;
           unit_price_text?: string | null;
           product_title?: string | null;
           product_url?: string | null;

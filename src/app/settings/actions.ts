@@ -46,6 +46,7 @@ export type RefreshPricesResult =
         outOfStock: number;
       };
       durationMs: number;
+      warnings?: string[];
     }
   | { ok: false; error: string };
 

@@ -35,23 +35,32 @@ export function RefreshPricesButton() {
         <p className="text-xs text-red-600">Error: {result.error}</p>
       )}
       {result && result.ok && (
-        <p className="text-xs text-[var(--muted)]">
-          Checked {result.totals.requested} product
-          {result.totals.requested === 1 ? "" : "s"}
-          {" · "}
-          {result.totals.updated} price
-          {result.totals.updated === 1 ? "" : "s"} saved
-          {result.totals.outOfStock > 0 && (
-            <>
-              {" · "}
-              <span className="text-amber-700">
-                {result.totals.outOfStock} out of stock
-              </span>
-            </>
+        <>
+          <p className="text-xs text-[var(--muted)]">
+            Checked {result.totals.requested} product
+            {result.totals.requested === 1 ? "" : "s"}
+            {" · "}
+            {result.totals.updated} price
+            {result.totals.updated === 1 ? "" : "s"} saved
+            {result.totals.outOfStock > 0 && (
+              <>
+                {" · "}
+                <span className="text-amber-700">
+                  {result.totals.outOfStock} out of stock
+                </span>
+              </>
+            )}
+            {" · "}
+            <span className="italic">took {(result.durationMs / 1000).toFixed(1)}s</span>
+          </p>
+          {result.warnings && result.warnings.length > 0 && (
+            <ul className="text-xs text-amber-700 list-disc list-inside space-y-0.5">
+              {result.warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
           )}
-          {" · "}
-          <span className="italic">took {(result.durationMs / 1000).toFixed(1)}s</span>
-        </p>
+        </>
       )}
       {pending && (
         <p className="text-xs italic text-[var(--muted)]">

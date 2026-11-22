@@ -34,3 +34,27 @@ export async function setPostcodeAction(raw: string): Promise<ActionResult> {
     return { ok: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 }
+
+export type RefreshPricesResult =
+  | {
+      ok: true;
+      totals: {
+        requested: number;
+        products: number;
+        notes: number;
+        updated: number;
+        outOfStock: number;
+      };
+      durationMs: number;
+    }
+  | { ok: false; error: string };
+
+export async function refreshPricesAction(): Promise<RefreshPricesResult> {
+  const { refreshPrices } = await import("@/lib/price-refresh");
+  const result = await refreshPrices();
+  if (result.ok) {
+    revalidatePath("/shopping");
+    revalidatePath("/settings");
+  }
+  return result;
+}

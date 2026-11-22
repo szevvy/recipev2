@@ -5,6 +5,7 @@ import type { CategoryMetaRow, Ingredient } from "@/lib/types";
 import { CategoryManager, type CategoryRow } from "./CategoryManager";
 import { PostcodeInput } from "./PostcodeInput";
 import { RebuildPantryButton } from "./RebuildPantryButton";
+import { RefreshPricesButton } from "./RefreshPricesButton";
 import { WeekStartPicker } from "./WeekStartPicker";
 
 export const instant = false;
@@ -75,6 +76,19 @@ export default async function SettingsPage() {
             </p>
           </div>
           <PostcodeInput initial={settings.postcode} />
+        </section>
+
+        <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-3">
+          <div>
+            <h2 className="font-serif text-xl text-[var(--foreground)]">Prices</h2>
+            <p className="text-xs text-[var(--muted)] mt-0.5">
+              Pulls fresh prices for every ingredient with a retailer stock
+              code via Apify&apos;s scraper. Runs daily on a Vercel cron
+              (6am AEST); hit this button if you want an on-demand refresh.
+              Needs <code>APIFY_TOKEN</code> set in Vercel env.
+            </p>
+          </div>
+          <RefreshPricesButton />
         </section>
 
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-3">

@@ -48,6 +48,25 @@ export async function createIngredientAction(fd: FormData): Promise<ActionResult
         .insert(rows);
       if (memErr) return { ok: false, error: memErr.message };
     }
+    const retailerRows = (["coles", "woolworths", "aldi"] as const)
+      .map((retailer) => ({
+        retailer,
+        stock_code: input.retailer_codes[retailer],
+      }))
+      .filter((r): r is { retailer: "coles" | "woolworths" | "aldi"; stock_code: string } =>
+        !!r.stock_code,
+      )
+      .map((r) => ({
+        ingredient_id: inserted.id,
+        retailer: r.retailer,
+        stock_code: r.stock_code,
+      }));
+    if (retailerRows.length > 0) {
+      const { error: codesErr } = await supabase
+        .from("ingredient_retailer_codes")
+        .insert(retailerRows);
+      if (codesErr) return { ok: false, error: codesErr.message };
+    }
     revalidatePath("/ingredients");
     return { ok: true };
   } catch (err) {
@@ -95,6 +114,36 @@ export async function updateIngredientAction(id: string, fd: FormData): Promise<
         .from("ingredient_list_memberships")
         .insert(toAdd.map((list_name) => ({ ingredient_id: id, list_name })));
       if (insErr) return { ok: false, error: insErr.message };
+    }
+
+    // Reconcile retailer codes: upsert any non-blank code, delete any
+    // retailer whose code the user cleared. Also drop the matching
+    // ingredient_prices row when the code is removed so stale data
+    // doesn't linger.
+    for (const retailer of ["coles", "woolworths", "aldi"] as const) {
+      const code = input.retailer_codes[retailer];
+      if (code) {
+        const { error: upsertErr } = await supabase
+          .from("ingredient_retailer_codes")
+          .upsert(
+            { ingredient_id: id, retailer, stock_code: code },
+            { onConflict: "ingredient_id,retailer" },
+          );
+        if (upsertErr) return { ok: false, error: upsertErr.message };
+      } else {
+        const { error: delCodeErr } = await supabase
+          .from("ingredient_retailer_codes")
+          .delete()
+          .eq("ingredient_id", id)
+          .eq("retailer", retailer);
+        if (delCodeErr) return { ok: false, error: delCodeErr.message };
+        const { error: delPriceErr } = await supabase
+          .from("ingredient_prices")
+          .delete()
+          .eq("ingredient_id", id)
+          .eq("retailer", retailer);
+        if (delPriceErr) return { ok: false, error: delPriceErr.message };
+      }
     }
     revalidatePath("/ingredients");
     return { ok: true };
@@ -144,6 +193,42 @@ export async function removeIngredientFromListAction(
     .delete()
     .eq("ingredient_id", ingredientId)
     .eq("list_name", listName);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// Persist the per-retailer stock code for one ingredient. Blank/empty
+// stock_code means delete the row (user cleared it). The price-refresh
+// cron reads this table to know which SKUs to look up.
+export async function setIngredientRetailerCodeAction(
+  ingredientId: string,
+  retailer: "coles" | "woolworths" | "aldi",
+  stockCode: string,
+): Promise<ActionResult> {
+  const trimmed = stockCode.trim();
+  const supabase = supabaseAdmin();
+  if (!trimmed) {
+    const { error } = await supabase
+      .from("ingredient_retailer_codes")
+      .delete()
+      .eq("ingredient_id", ingredientId)
+      .eq("retailer", retailer);
+    if (error) return { ok: false, error: error.message };
+    // Also drop any stale price snapshot for this (ingredient, retailer).
+    await supabase
+      .from("ingredient_prices")
+      .delete()
+      .eq("ingredient_id", ingredientId)
+      .eq("retailer", retailer);
+    return { ok: true };
+  }
+  // Upsert on PK (ingredient_id, retailer).
+  const { error } = await supabase
+    .from("ingredient_retailer_codes")
+    .upsert(
+      { ingredient_id: ingredientId, retailer, stock_code: trimmed },
+      { onConflict: "ingredient_id,retailer" },
+    );
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }

@@ -30,6 +30,8 @@ export async function GET() {
     categoryMetaResp,
     latestPurchasesResp,
     listMembershipsResp,
+    retailerCodesResp,
+    pricesResp,
   ] = await Promise.all([
     supabase
       .from("shopping_items")
@@ -60,6 +62,10 @@ export async function GET() {
     supabase
       .from("ingredient_list_memberships")
       .select("ingredient_id, list_name"),
+    supabase
+      .from("ingredient_retailer_codes")
+      .select("ingredient_id, retailer, stock_code"),
+    supabase.from("ingredient_prices").select("*"),
   ]);
 
   const firstErr =
@@ -69,24 +75,41 @@ export async function GET() {
     mealsResp.error ??
     categoryMetaResp.error ??
     latestPurchasesResp.error ??
-    listMembershipsResp.error;
+    listMembershipsResp.error ??
+    retailerCodesResp.error ??
+    pricesResp.error;
   if (firstErr) {
     return NextResponse.json({ ok: false, error: firstErr.message }, { status: 500 });
   }
 
-  // Attach list memberships to each ingredient so the client never needs a
-  // separate lookup. Each ingredient.lists is a de-duped, alpha-sorted array.
+  // Attach list memberships + retailer codes to each ingredient so the
+  // client never needs a separate lookup.
   const listsByIngredientId = new Map<string, string[]>();
   for (const row of listMembershipsResp.data ?? []) {
     const list = listsByIngredientId.get(row.ingredient_id) ?? [];
     list.push(row.list_name);
     listsByIngredientId.set(row.ingredient_id, list);
   }
+  type RetailerCodes = {
+    coles: string | null;
+    woolworths: string | null;
+    aldi: string | null;
+  };
+  function emptyCodes(): RetailerCodes {
+    return { coles: null, woolworths: null, aldi: null };
+  }
+  const codesByIngredientId = new Map<string, RetailerCodes>();
+  for (const row of retailerCodesResp.data ?? []) {
+    const current = codesByIngredientId.get(row.ingredient_id) ?? emptyCodes();
+    current[row.retailer as keyof RetailerCodes] = row.stock_code;
+    codesByIngredientId.set(row.ingredient_id, current);
+  }
   const ingredients = (ingredientsResp.data ?? []).map((i) => ({
     ...i,
     lists: (listsByIngredientId.get(i.id) ?? []).slice().sort((a, b) =>
       a.localeCompare(b),
     ),
+    retailer_codes: codesByIngredientId.get(i.id) ?? emptyCodes(),
   }));
 
   return NextResponse.json({
@@ -100,6 +123,7 @@ export async function GET() {
       meals: mealsResp.data ?? [],
       categoryMeta: categoryMetaResp.data ?? [],
       latestPurchases: latestPurchasesResp.data ?? [],
+      prices: pricesResp.data ?? [],
     },
   });
 }

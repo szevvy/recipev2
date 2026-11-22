@@ -41,6 +41,19 @@ export const IngredientInputSchema = z.object({
     .pipe(z.number().int().positive().nullable())
     .optional()
     .transform((v) => v ?? null),
+  // Per-retailer SKU/stock code. Blank/missing = not linked to that retailer.
+  retailer_codes: z
+    .object({
+      coles: z.string().trim().max(60).optional().nullable(),
+      woolworths: z.string().trim().max(60).optional().nullable(),
+      aldi: z.string().trim().max(60).optional().nullable(),
+    })
+    .optional()
+    .transform((v) => ({
+      coles: v?.coles?.trim() || null,
+      woolworths: v?.woolworths?.trim() || null,
+      aldi: v?.aldi?.trim() || null,
+    })),
 });
 
 export type IngredientInput = z.infer<typeof IngredientInputSchema>;
@@ -66,6 +79,11 @@ export function parseIngredientForm(fd: FormData): IngredientInput {
     lists,
     linked_recipe_id: String(fd.get("linked_recipe_id") ?? ""),
     shelf_life_days: String(fd.get("shelf_life_days") ?? ""),
+    retailer_codes: {
+      coles: String(fd.get("retailer_coles") ?? ""),
+      woolworths: String(fd.get("retailer_woolworths") ?? ""),
+      aldi: String(fd.get("retailer_aldi") ?? ""),
+    },
   };
   return IngredientInputSchema.parse(raw);
 }

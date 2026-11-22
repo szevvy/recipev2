@@ -64,6 +64,7 @@ export function AddIngredientForm({
       lists: [...lists].sort((a, b) => a.localeCompare(b)),
       linked_recipe_id: linkedRecipeId,
       shelf_life_days: shelfLifeDays,
+      retailer_codes: { coles: null, woolworths: null, aldi: null },
       staple_state: "not_checked",
       created_at: nowIso,
       updated_at: nowIso,

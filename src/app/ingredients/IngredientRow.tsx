@@ -74,6 +74,11 @@ export function IngredientRow({
     }
     const nextLists = [...editLists].sort((a, b) => a.localeCompare(b));
     const nextLinkedRecipeId = editLinkedRecipeId;
+    const nextRetailerCodes = {
+      coles: String(fd.get("retailer_coles") ?? "").trim() || null,
+      woolworths: String(fd.get("retailer_woolworths") ?? "").trim() || null,
+      aldi: String(fd.get("retailer_aldi") ?? "").trim() || null,
+    };
     const snapshot = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
     qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
       if (!old) return old;
@@ -86,6 +91,7 @@ export function IngredientRow({
                 group_name: nextGroup || null,
                 lists: nextLists,
                 linked_recipe_id: nextLinkedRecipeId,
+                retailer_codes: nextRetailerCodes,
                 updated_at: new Date().toISOString(),
               }
             : i,
@@ -231,6 +237,26 @@ export function IngredientRow({
                 className="w-14 rounded-md border border-[var(--border)] bg-white px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
               />
               <span>days</span>
+            </label>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
+              <span className="w-20">Coles ID</span>
+              <input
+                name="retailer_coles"
+                defaultValue={ingredient.retailer_codes.coles ?? ""}
+                placeholder="e.g. 329607"
+                className="flex-1 rounded-md border border-[var(--border)] bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
+              <span className="w-20">Woolies ID</span>
+              <input
+                name="retailer_woolworths"
+                defaultValue={ingredient.retailer_codes.woolworths ?? ""}
+                placeholder="e.g. 12345"
+                className="flex-1 rounded-md border border-[var(--border)] bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
+              />
             </label>
           </div>
           <div className="flex gap-2 justify-end items-center">

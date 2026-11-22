@@ -33,6 +33,7 @@ describe("parseIngredientForm", () => {
       lists: ["Staples", "Baking essentials"],
       linked_recipe_id: null,
       shelf_life_days: null,
+      retailer_codes: { coles: null, woolworths: null, aldi: null },
     });
   });
 

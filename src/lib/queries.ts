@@ -5,6 +5,7 @@ import type {
   AppSettings,
   CategoryMetaRow,
   Ingredient,
+  IngredientPrice,
   MealPlanWithRecipe,
   Recipe,
   ShoppingItemWithIngredient,
@@ -23,6 +24,7 @@ export type BootstrapData = {
   meals: MealPlanWithRecipe[];
   categoryMeta: CategoryMetaRow[];
   latestPurchases: Array<{ ingredient_id: string; purchased_at: string }>;
+  prices: IngredientPrice[];
 };
 
 async function fetchBootstrap(): Promise<BootstrapData> {

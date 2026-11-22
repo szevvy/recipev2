@@ -17,6 +17,10 @@ export type Ingredient = {
   // 2 = that day or the next, etc. The shopping list uses this to suggest
   // delayed buy windows when the ingredient would spoil before its meal.
   shelf_life_days: number | null;
+  // Client-side augment from ingredient_retailer_codes: per-retailer SKU
+  // so the price-refresh cron knows which products to look up. Null for
+  // retailers the user hasn't linked yet.
+  retailer_codes: { coles: string | null; woolworths: string | null; aldi: string | null };
   staple_state: StapleState;
   created_at: string;
   updated_at: string;

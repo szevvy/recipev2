@@ -20,10 +20,10 @@ import type {
   WeekStart,
 } from "./types";
 
-// Row shape as stored in Postgres — the `lists` field on the client-side
-// Ingredient type is populated by the bootstrap API from the memberships
-// table and is not a column here.
-type IngredientRow = Omit<Ingredient, "lists">;
+// Row shape as stored in Postgres — the `lists` and `retailer_codes`
+// fields on the client-side Ingredient type are populated by the bootstrap
+// API from separate tables and are not columns here.
+type IngredientRow = Omit<Ingredient, "lists" | "retailer_codes">;
 
 type IngredientInsert = {
   id?: string;

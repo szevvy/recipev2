@@ -62,10 +62,13 @@ function toCents(n: number | null | undefined): number | null {
 
 function normaliseRetailer(raw: string | null | undefined): Retailer | null {
   if (!raw) return null;
+  // The actor returns the retailer with trailing qualifiers sometimes —
+  // "Woolworths Australia", "Coles Supermarkets" etc. — so match on a
+  // substring rather than an exact token.
   const lower = raw.toLowerCase();
-  if (lower === "coles") return "coles";
-  if (lower === "woolworths" || lower === "woolies") return "woolworths";
-  if (lower === "aldi") return "aldi";
+  if (lower.includes("coles")) return "coles";
+  if (lower.includes("woolworths") || lower.includes("woolies")) return "woolworths";
+  if (lower.includes("aldi")) return "aldi";
   return null;
 }
 

@@ -16,6 +16,29 @@ const RETAILER_LABEL: Record<Retailer, string> = {
   aldi: "ALDI",
 };
 
+// Derive pack size from pack + unit price (e.g. $7.40 pack @ $37/kg → 200g).
+// Converts sub-1 kg/L into g/ml so "200g" reads better than "0.2kg".
+function formatPackSize(
+  packCents: number,
+  unitCents: number,
+  uom: string,
+): string {
+  if (unitCents <= 0) return "";
+  const packInUom = packCents / unitCents;
+  const u = uom.toLowerCase();
+  if (u === "kg") {
+    if (packInUom < 1) return `${Math.round(packInUom * 1000)}g`;
+    return `${packInUom >= 10 ? packInUom.toFixed(0) : packInUom.toFixed(1)}kg`;
+  }
+  if (u === "l") {
+    if (packInUom < 1) return `${Math.round(packInUom * 1000)}ml`;
+    return `${packInUom >= 10 ? packInUom.toFixed(0) : packInUom.toFixed(1)}L`;
+  }
+  if (packInUom >= 10) return `${packInUom.toFixed(0)}${uom}`;
+  if (packInUom >= 1) return `${packInUom.toFixed(1)}${uom}`;
+  return `${packInUom.toFixed(2)}${uom}`;
+}
+
 // Expandable per-ingredient detail panel: every price snapshot grouped
 // by retailer, sorted cheapest first (unit price where available).
 // Used in the Ingredients list row expansion + the shopping list row's
@@ -83,21 +106,26 @@ export function IngredientPricesDetail({
                       </div>
                     )}
                   </div>
-                  <div className="text-right shrink-0">
+                  <div className="flex items-baseline gap-2 shrink-0 tabular-nums">
                     {p.price_cents != null ? (
                       <>
-                        <div className="font-medium tabular-nums">
+                        <span className="font-medium">
                           ${(p.price_cents / 100).toFixed(2)}
-                          {p.on_sale && (
-                            <span className="ml-1 text-[9px] uppercase tracking-wide text-[var(--sage)]">
-                              sale
+                          {p.unit_price_cents != null && p.unit_of_measure && (
+                            <span className="text-[var(--muted)] font-normal">
+                              /{formatPackSize(p.price_cents, p.unit_price_cents, p.unit_of_measure)}
                             </span>
                           )}
-                        </div>
+                        </span>
                         {p.unit_price_cents != null && p.unit_of_measure && (
-                          <div className="text-[10px] text-[var(--muted)] tabular-nums">
+                          <span className="text-[var(--muted)]">
                             ${(p.unit_price_cents / 100).toFixed(2)}/{p.unit_of_measure}
-                          </div>
+                          </span>
+                        )}
+                        {p.on_sale && (
+                          <span className="text-[9px] uppercase tracking-wide text-[var(--sage)]">
+                            sale
+                          </span>
                         )}
                       </>
                     ) : (

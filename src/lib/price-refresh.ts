@@ -86,76 +86,54 @@ export async function refreshPrices(): Promise<RefreshResult> {
     };
   }
 
-  // Build lookup: "retailer:stock_code" -> ingredient_id; also group
-  // product IDs by retailer — the actor only accepts one retailer per
-  // run when driven by productIds, so we fan out one call per retailer
-  // and merge.
+  // Build lookup: "retailer:stock_code" -> ingredient_id. The actor accepts
+  // a mixed productIds list with retailer:id prefixes so one call covers
+  // every retailer.
   const ingredientLookup = new Map<string, string>();
-  const productIdsByRetailer = new Map<Retailer, string[]>();
+  const retailerSet = new Set<Retailer>();
+  const productIds: string[] = [];
   for (const row of codeRows) {
-    const retailer = row.retailer as Retailer;
-    const key = `${retailer}:${row.stock_code}`;
+    const key = `${row.retailer}:${row.stock_code}`;
     ingredientLookup.set(key, row.ingredient_id);
-    const bucket = productIdsByRetailer.get(retailer) ?? [];
-    bucket.push(key);
-    productIdsByRetailer.set(retailer, bucket);
+    retailerSet.add(row.retailer as Retailer);
+    productIds.push(key);
   }
+
+  const body = {
+    retailers: Array.from(retailerSet),
+    productIds,
+    postalCodes: [postcode],
+    maxItemsPerRetailer: Math.max(50, productIds.length),
+    maxItems: Math.max(100, productIds.length * 2),
+    includeDetails: false,
+  };
 
   const url = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(
     token,
   )}`;
 
-  async function runForRetailer(
-    retailer: Retailer,
-    ids: string[],
-  ): Promise<{ rows: DatasetRow[] } | { error: string }> {
-    const body = {
-      retailers: [retailer],
-      productIds: ids,
-      postalCodes: [postcode],
-      maxItemsPerRetailer: Math.max(50, ids.length),
-      maxItems: Math.max(100, ids.length * 2),
-      includeDetails: false,
-    };
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        return { error: `Apify ${retailer} returned ${res.status}: ${text.slice(0, 200)}` };
-      }
-      const data = (await res.json()) as DatasetRow[];
-      return { rows: data };
-    } catch (e) {
+  let rows: DatasetRow[] = [];
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text();
       return {
-        error: e instanceof Error ? e.message : `Apify ${retailer} call failed`,
+        ok: false,
+        error: `Apify returned ${res.status}: ${text.slice(0, 200)}`,
       };
     }
+    rows = (await res.json()) as DatasetRow[];
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Apify call failed",
+    };
   }
-
-  const runs = Array.from(productIdsByRetailer.entries()).map(([retailer, ids]) =>
-    runForRetailer(retailer, ids).then((r) => ({ retailer, ...r })),
-  );
-  const settled = await Promise.all(runs);
-
   const errors: string[] = [];
-  let rows: DatasetRow[] = [];
-  for (const r of settled) {
-    if ("error" in r && r.error) {
-      errors.push(r.error);
-      continue;
-    }
-    if ("rows" in r && r.rows) rows = rows.concat(r.rows);
-  }
-  // If every per-retailer call failed, treat as a hard failure. If at
-  // least one succeeded, continue and surface the failures as a warning
-  // field on the result.
-  if (rows.length === 0 && errors.length > 0) {
-    return { ok: false, error: errors.join("; ") };
-  }
 
   // Index results by (retailer, productId) so we can match back to codes.
   const resultByKey = new Map<string, DatasetRow>();

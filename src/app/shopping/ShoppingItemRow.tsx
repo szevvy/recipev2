@@ -178,30 +178,35 @@ export function ShoppingItemRow({
           )}
           {priceChips.length > 0 && (
             <div className="mt-0.5 flex items-center gap-2 text-[10px]">
-              {priceChips.map((c) => (
+              {priceChips.map((g) => (
                 <span
-                  key={c.retailer}
+                  key={g.key}
                   className={
                     "inline-flex items-center gap-1 " +
-                    (c.cheapest
+                    (g.cheapest
                       ? "text-[var(--accent)] font-semibold"
                       : "text-[var(--muted)]")
                   }
-                  title={c.title}
+                  title={g.title}
                 >
-                  <img
-                    src={c.icon}
-                    alt={c.retailer}
-                    width={12}
-                    height={12}
-                    className="rounded-sm shrink-0"
-                  />
-                  {c.outOfStock ? (
+                  <span className="inline-flex items-center gap-0.5">
+                    {g.retailers.map((r) => (
+                      <img
+                        key={r.retailer}
+                        src={r.icon}
+                        alt={r.retailer}
+                        width={12}
+                        height={12}
+                        className="rounded-sm shrink-0"
+                      />
+                    ))}
+                  </span>
+                  {g.outOfStock ? (
                     <span className="line-through">OOS</span>
                   ) : (
-                    <span>{c.priceLabel}</span>
+                    <span>{g.priceLabel}</span>
                   )}
-                  {c.onSale && !c.outOfStock && (
+                  {g.onSale && !g.outOfStock && (
                     <span className="text-[9px] uppercase tracking-wide text-[var(--sage)]">
                       sale
                     </span>

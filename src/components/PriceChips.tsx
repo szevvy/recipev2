@@ -4,17 +4,25 @@ import { useQueryClient } from "@tanstack/react-query";
 import { BOOTSTRAP_KEY, type BootstrapData } from "@/lib/queries";
 import type { Retailer } from "@/lib/types";
 
-type Chip = {
-  retailer: Retailer;
-  icon: string;
+// A chip group: one price label, one or more retailer icons. When two
+// retailers advertise the exact same price we collapse them into a
+// single chip ([coles][woolies] $37.00/kg) — see grouping logic below.
+export type ChipGroup = {
+  key: string;
+  retailers: {
+    retailer: Retailer;
+    icon: string;
+    // Non-empty when that retailer has more than one SKU — tells the
+    // user which specific variant the group's price is quoting.
+    variantHint: string | null;
+  }[];
   priceLabel: string;
-  // Non-empty when the retailer has more than one SKU — tells the user
-  // which specific variant the chip's price is quoting (e.g. "Salmon
-  // Skin On" when there are two salmon SKUs).
-  variantHint: string | null;
   cheapest: boolean;
   outOfStock: boolean;
+  // Only true when every retailer in the group is on sale — avoids
+  // falsely implying a non-sale retailer is on sale after a merge.
   onSale: boolean;
+  // Multi-line tooltip: each retailer's per-SKU breakdown.
   title: string;
 };
 
@@ -29,7 +37,7 @@ const RETAILER_LABEL: Record<Retailer, string> = {
   aldi: "ALDI",
 };
 
-export function usePriceChipsFor(ingredientId: string | null): Chip[] {
+export function usePriceChipsFor(ingredientId: string | null): ChipGroup[] {
   const qc = useQueryClient();
   if (!ingredientId) return [];
   const bootstrap = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
@@ -137,7 +145,7 @@ export function usePriceChipsFor(ingredientId: string | null): Chip[] {
           .reduce<number | null>((acc, v) => (acc == null || v < acc ? v : acc), null)
       : null;
 
-  return pricings
+  const perRetailer = pricings
     .slice()
     .sort((a, b) => a.retailer.localeCompare(b.retailer))
     .map((p) => {
@@ -164,9 +172,55 @@ export function usePriceChipsFor(ingredientId: string | null): Chip[] {
         title:
           p.titleLines.length > 1
             ? `${RETAILER_LABEL[p.retailer]}:\n${p.titleLines.join("\n")}`
-            : p.titleLines[0] ?? RETAILER_LABEL[p.retailer],
+            : `${RETAILER_LABEL[p.retailer]}: ${p.titleLines[0] ?? ""}`,
       };
     });
+
+  // Collapse retailers that advertise the exact same price label into
+  // one chip. OOS chips stay per-retailer so we don't hide which
+  // retailer is actually out. `onSale` only sticks when every merged
+  // retailer is on sale — otherwise we'd be labelling a non-sale item
+  // as discounted.
+  const groups = new Map<string, ChipGroup>();
+  for (const c of perRetailer) {
+    const key = c.outOfStock ? `oos:${c.retailer}` : `price:${c.priceLabel}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.retailers.push({
+        retailer: c.retailer,
+        icon: c.icon,
+        variantHint: c.variantHint,
+      });
+      existing.onSale = existing.onSale && c.onSale;
+      existing.cheapest = existing.cheapest || c.cheapest;
+      existing.title = `${existing.title}\n\n${c.title}`;
+    } else {
+      groups.set(key, {
+        key,
+        retailers: [
+          {
+            retailer: c.retailer,
+            icon: c.icon,
+            variantHint: c.variantHint,
+          },
+        ],
+        priceLabel: c.priceLabel,
+        cheapest: c.cheapest,
+        outOfStock: c.outOfStock,
+        onSale: c.onSale,
+        title: c.title,
+      });
+    }
+  }
+
+  // Sort so cheapest first, then by first retailer name (stable order).
+  return Array.from(groups.values()).sort((a, b) => {
+    if (a.cheapest !== b.cheapest) return a.cheapest ? -1 : 1;
+    if (a.outOfStock !== b.outOfStock) return a.outOfStock ? 1 : -1;
+    return (a.retailers[0]?.retailer ?? "").localeCompare(
+      b.retailers[0]?.retailer ?? "",
+    );
+  });
 }
 
 export function PriceChips({
@@ -176,47 +230,56 @@ export function PriceChips({
   ingredientId: string | null;
   size?: "sm" | "md";
 }) {
-  const chips = usePriceChipsFor(ingredientId);
-  if (chips.length === 0) return null;
+  const groups = usePriceChipsFor(ingredientId);
+  if (groups.length === 0) return null;
   const textCls = size === "sm" ? "text-[10px]" : "text-xs";
   const iconPx = size === "sm" ? 10 : 12;
   return (
     <div className={`flex items-center gap-2 ${textCls}`}>
-      {chips.map((c) => (
-        <span
-          key={c.retailer}
-          className={
-            "inline-flex items-center gap-1 " +
-            (c.cheapest
-              ? "text-[var(--accent)] font-semibold"
-              : "text-[var(--muted)]")
-          }
-          title={c.title}
-        >
-          <img
-            src={c.icon}
-            alt={c.retailer}
-            width={iconPx}
-            height={iconPx}
-            className="rounded-sm shrink-0"
-          />
-          {c.outOfStock ? (
-            <span className="line-through">OOS</span>
-          ) : (
-            <span>{c.priceLabel}</span>
-          )}
-          {c.variantHint && !c.outOfStock && (
-            <span className="italic text-[var(--muted)] truncate max-w-[12ch]">
-              · {c.variantHint}
+      {groups.map((g) => {
+        const soloVariantHint =
+          g.retailers.length === 1 ? g.retailers[0].variantHint : null;
+        return (
+          <span
+            key={g.key}
+            className={
+              "inline-flex items-center gap-1 " +
+              (g.cheapest
+                ? "text-[var(--accent)] font-semibold"
+                : "text-[var(--muted)]")
+            }
+            title={g.title}
+          >
+            <span className="inline-flex items-center gap-0.5">
+              {g.retailers.map((r) => (
+                <img
+                  key={r.retailer}
+                  src={r.icon}
+                  alt={r.retailer}
+                  width={iconPx}
+                  height={iconPx}
+                  className="rounded-sm shrink-0"
+                />
+              ))}
             </span>
-          )}
-          {c.onSale && !c.outOfStock && (
-            <span className="text-[9px] uppercase tracking-wide text-[var(--sage)]">
-              sale
-            </span>
-          )}
-        </span>
-      ))}
+            {g.outOfStock ? (
+              <span className="line-through">OOS</span>
+            ) : (
+              <span>{g.priceLabel}</span>
+            )}
+            {soloVariantHint && !g.outOfStock && (
+              <span className="italic text-[var(--muted)] truncate max-w-[12ch]">
+                · {soloVariantHint}
+              </span>
+            )}
+            {g.onSale && !g.outOfStock && (
+              <span className="text-[9px] uppercase tracking-wide text-[var(--sage)]">
+                sale
+              </span>
+            )}
+          </span>
+        );
+      })}
     </div>
   );
 }

@@ -86,16 +86,28 @@ export async function refreshPrices(): Promise<RefreshResult> {
     };
   }
 
-  // Build lookup: "retailer:stock_code" -> ingredient_id. The actor accepts
-  // a mixed productIds list with retailer:id prefixes so one call covers
-  // every retailer.
-  const ingredientLookup = new Map<string, string>();
+  // Build lookup: "retailer:stock_code" -> { ingredient_id, retailer,
+  // stock_code }. The actor accepts a mixed productIds list with
+  // retailer:id prefixes so one call covers every retailer, and the
+  // ingredient_prices PK is now (ingredient_id, retailer, stock_code) so
+  // we track every variant separately.
+  type CodeRef = {
+    ingredient_id: string;
+    retailer: Retailer;
+    stock_code: string;
+  };
+  const ingredientLookup = new Map<string, CodeRef>();
   const retailerSet = new Set<Retailer>();
   const productIds: string[] = [];
   for (const row of codeRows) {
-    const key = `${row.retailer}:${row.stock_code}`;
-    ingredientLookup.set(key, row.ingredient_id);
-    retailerSet.add(row.retailer as Retailer);
+    const retailer = row.retailer as Retailer;
+    const key = `${retailer}:${row.stock_code}`;
+    ingredientLookup.set(key, {
+      ingredient_id: row.ingredient_id,
+      retailer,
+      stock_code: row.stock_code,
+    });
+    retailerSet.add(retailer);
     productIds.push(key);
   }
 
@@ -155,12 +167,14 @@ export async function refreshPrices(): Promise<RefreshResult> {
     resultByKey.set(`${row.retailer}:${row.productId}`, row);
   }
 
-  // Upsert prices + count out-of-stocks.
+  // Upsert prices + count out-of-stocks. One row per (ingredient, retailer,
+  // stock_code) so we capture every variant.
   let updated = 0;
   let outOfStock = 0;
   const upserts: {
     ingredient_id: string;
     retailer: Retailer;
+    stock_code: string;
     price_cents: number | null;
     regular_price_cents: number | null;
     on_sale: boolean;
@@ -173,16 +187,16 @@ export async function refreshPrices(): Promise<RefreshResult> {
     fetched_at: string;
   }[] = [];
   const nowIso = new Date().toISOString();
-  for (const [key, ingredientId] of ingredientLookup) {
-    const [retailer] = key.split(":") as [Retailer, string];
+  for (const [key, ref] of ingredientLookup) {
     const match = resultByKey.get(key) ?? null;
     const isProduct = match?.recordType === "PRODUCT";
     const inStock =
       isProduct && (match?.inStock ?? true) !== false;
     if (!inStock) outOfStock++;
     upserts.push({
-      ingredient_id: ingredientId,
-      retailer,
+      ingredient_id: ref.ingredient_id,
+      retailer: ref.retailer,
+      stock_code: ref.stock_code,
       price_cents: isProduct ? toCents(match?.price ?? null) : null,
       regular_price_cents: isProduct ? toCents(match?.regularPrice ?? null) : null,
       on_sale: !!(isProduct && match?.onSale),
@@ -202,7 +216,7 @@ export async function refreshPrices(): Promise<RefreshResult> {
   if (upserts.length > 0) {
     const { error: upsertErr } = await supabase
       .from("ingredient_prices")
-      .upsert(upserts, { onConflict: "ingredient_id,retailer" });
+      .upsert(upserts, { onConflict: "ingredient_id,retailer,stock_code" });
     if (upsertErr) return { ok: false, error: upsertErr.message };
     updated = upserts.length;
   }

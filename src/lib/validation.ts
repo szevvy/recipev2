@@ -41,20 +41,38 @@ export const IngredientInputSchema = z.object({
     .pipe(z.number().int().positive().nullable())
     .optional()
     .transform((v) => v ?? null),
-  // Per-retailer SKU/stock code. Blank/missing = not linked to that retailer.
+  // Per-retailer SKU/stock codes. Comma-separated string on the way in
+  // (one ingredient can track several variants — e.g. salmon skin-on
+  // AND skin-off). Empty/missing = not linked. Values are de-duped and
+  // normalised on parse.
   retailer_codes: z
     .object({
-      coles: z.string().trim().max(60).optional().nullable(),
-      woolworths: z.string().trim().max(60).optional().nullable(),
-      aldi: z.string().trim().max(60).optional().nullable(),
+      coles: z.string().optional().nullable(),
+      woolworths: z.string().optional().nullable(),
+      aldi: z.string().optional().nullable(),
     })
     .optional()
     .transform((v) => ({
-      coles: v?.coles?.trim() || null,
-      woolworths: v?.woolworths?.trim() || null,
-      aldi: v?.aldi?.trim() || null,
+      coles: splitCodes(v?.coles ?? null),
+      woolworths: splitCodes(v?.woolworths ?? null),
+      aldi: splitCodes(v?.aldi ?? null),
     })),
 });
+
+function splitCodes(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split(/[,\s]+/)) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    if (trimmed.length > 60) continue;
+    if (seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
+}
 
 export type IngredientInput = z.infer<typeof IngredientInputSchema>;
 

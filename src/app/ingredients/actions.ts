@@ -48,19 +48,16 @@ export async function createIngredientAction(fd: FormData): Promise<ActionResult
         .insert(rows);
       if (memErr) return { ok: false, error: memErr.message };
     }
-    const retailerRows = (["coles", "woolworths", "aldi"] as const)
-      .map((retailer) => ({
-        retailer,
-        stock_code: input.retailer_codes[retailer],
-      }))
-      .filter((r): r is { retailer: "coles" | "woolworths" | "aldi"; stock_code: string } =>
-        !!r.stock_code,
-      )
-      .map((r) => ({
-        ingredient_id: inserted.id,
-        retailer: r.retailer,
-        stock_code: r.stock_code,
-      }));
+    const retailerRows: Array<{
+      ingredient_id: string;
+      retailer: "coles" | "woolworths" | "aldi";
+      stock_code: string;
+    }> = [];
+    for (const retailer of ["coles", "woolworths", "aldi"] as const) {
+      for (const stock_code of input.retailer_codes[retailer]) {
+        retailerRows.push({ ingredient_id: inserted.id, retailer, stock_code });
+      }
+    }
     if (retailerRows.length > 0) {
       const { error: codesErr } = await supabase
         .from("ingredient_retailer_codes")
@@ -116,32 +113,47 @@ export async function updateIngredientAction(id: string, fd: FormData): Promise<
       if (insErr) return { ok: false, error: insErr.message };
     }
 
-    // Reconcile retailer codes: upsert any non-blank code, delete any
-    // retailer whose code the user cleared. Also drop the matching
-    // ingredient_prices row when the code is removed so stale data
-    // doesn't linger.
+    // Reconcile retailer codes per retailer. The target is the parsed
+    // comma-separated list for that retailer; anything stored but no
+    // longer in the target set is deleted, anything new is inserted.
+    // We also drop matching ingredient_prices rows for removed codes so
+    // stale snapshots don't linger.
+    const { data: currentCodes, error: readCodesErr } = await supabase
+      .from("ingredient_retailer_codes")
+      .select("retailer, stock_code")
+      .eq("ingredient_id", id);
+    if (readCodesErr) return { ok: false, error: readCodesErr.message };
+    const currentByRetailer = new Map<string, Set<string>>();
+    for (const row of currentCodes ?? []) {
+      const set = currentByRetailer.get(row.retailer) ?? new Set<string>();
+      set.add(row.stock_code);
+      currentByRetailer.set(row.retailer, set);
+    }
     for (const retailer of ["coles", "woolworths", "aldi"] as const) {
-      const code = input.retailer_codes[retailer];
-      if (code) {
-        const { error: upsertErr } = await supabase
+      const target = new Set(input.retailer_codes[retailer]);
+      const current = currentByRetailer.get(retailer) ?? new Set<string>();
+      const toAdd = [...target].filter((c) => !current.has(c));
+      const toRemove = [...current].filter((c) => !target.has(c));
+      if (toAdd.length > 0) {
+        const { error: insErr } = await supabase
           .from("ingredient_retailer_codes")
-          .upsert(
-            { ingredient_id: id, retailer, stock_code: code },
-            { onConflict: "ingredient_id,retailer" },
-          );
-        if (upsertErr) return { ok: false, error: upsertErr.message };
-      } else {
-        const { error: delCodeErr } = await supabase
+          .insert(toAdd.map((stock_code) => ({ ingredient_id: id, retailer, stock_code })));
+        if (insErr) return { ok: false, error: insErr.message };
+      }
+      if (toRemove.length > 0) {
+        const { error: delErr } = await supabase
           .from("ingredient_retailer_codes")
           .delete()
           .eq("ingredient_id", id)
-          .eq("retailer", retailer);
-        if (delCodeErr) return { ok: false, error: delCodeErr.message };
+          .eq("retailer", retailer)
+          .in("stock_code", toRemove);
+        if (delErr) return { ok: false, error: delErr.message };
         const { error: delPriceErr } = await supabase
           .from("ingredient_prices")
           .delete()
           .eq("ingredient_id", id)
-          .eq("retailer", retailer);
+          .eq("retailer", retailer)
+          .in("stock_code", toRemove);
         if (delPriceErr) return { ok: false, error: delPriceErr.message };
       }
     }
@@ -197,38 +209,3 @@ export async function removeIngredientFromListAction(
   return { ok: true };
 }
 
-// Persist the per-retailer stock code for one ingredient. Blank/empty
-// stock_code means delete the row (user cleared it). The price-refresh
-// cron reads this table to know which SKUs to look up.
-export async function setIngredientRetailerCodeAction(
-  ingredientId: string,
-  retailer: "coles" | "woolworths" | "aldi",
-  stockCode: string,
-): Promise<ActionResult> {
-  const trimmed = stockCode.trim();
-  const supabase = supabaseAdmin();
-  if (!trimmed) {
-    const { error } = await supabase
-      .from("ingredient_retailer_codes")
-      .delete()
-      .eq("ingredient_id", ingredientId)
-      .eq("retailer", retailer);
-    if (error) return { ok: false, error: error.message };
-    // Also drop any stale price snapshot for this (ingredient, retailer).
-    await supabase
-      .from("ingredient_prices")
-      .delete()
-      .eq("ingredient_id", ingredientId)
-      .eq("retailer", retailer);
-    return { ok: true };
-  }
-  // Upsert on PK (ingredient_id, retailer).
-  const { error } = await supabase
-    .from("ingredient_retailer_codes")
-    .upsert(
-      { ingredient_id: ingredientId, retailer, stock_code: trimmed },
-      { onConflict: "ingredient_id,retailer" },
-    );
-  if (error) return { ok: false, error: error.message };
-  return { ok: true };
-}

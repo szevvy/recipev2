@@ -18,9 +18,10 @@ export type Ingredient = {
   // delayed buy windows when the ingredient would spoil before its meal.
   shelf_life_days: number | null;
   // Client-side augment from ingredient_retailer_codes: per-retailer SKU
-  // so the price-refresh cron knows which products to look up. Null for
-  // retailers the user hasn't linked yet.
-  retailer_codes: { coles: string | null; woolworths: string | null; aldi: string | null };
+  // list (one ingredient may track several variants at a retailer, e.g.
+  // salmon skin-on + skin-off). Empty array when the user hasn't linked
+  // that retailer yet.
+  retailer_codes: { coles: string[]; woolworths: string[]; aldi: string[] };
   staple_state: StapleState;
   created_at: string;
   updated_at: string;
@@ -201,6 +202,7 @@ export type IngredientRetailerCode = {
 export type IngredientPrice = {
   ingredient_id: string;
   retailer: Retailer;
+  stock_code: string;
   price_cents: number | null;
   regular_price_cents: number | null;
   on_sale: boolean;

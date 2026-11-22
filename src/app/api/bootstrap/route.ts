@@ -91,18 +91,23 @@ export async function GET() {
     listsByIngredientId.set(row.ingredient_id, list);
   }
   type RetailerCodes = {
-    coles: string | null;
-    woolworths: string | null;
-    aldi: string | null;
+    coles: string[];
+    woolworths: string[];
+    aldi: string[];
   };
   function emptyCodes(): RetailerCodes {
-    return { coles: null, woolworths: null, aldi: null };
+    return { coles: [], woolworths: [], aldi: [] };
   }
   const codesByIngredientId = new Map<string, RetailerCodes>();
   for (const row of retailerCodesResp.data ?? []) {
     const current = codesByIngredientId.get(row.ingredient_id) ?? emptyCodes();
-    current[row.retailer as keyof RetailerCodes] = row.stock_code;
+    current[row.retailer as keyof RetailerCodes].push(row.stock_code);
     codesByIngredientId.set(row.ingredient_id, current);
+  }
+  for (const codes of codesByIngredientId.values()) {
+    codes.coles.sort();
+    codes.woolworths.sort();
+    codes.aldi.sort();
   }
   const ingredients = (ingredientsResp.data ?? []).map((i) => ({
     ...i,

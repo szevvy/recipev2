@@ -75,10 +75,21 @@ export function IngredientRow({
     }
     const nextLists = [...editLists].sort((a, b) => a.localeCompare(b));
     const nextLinkedRecipeId = editLinkedRecipeId;
+    function parseCodes(raw: string): string[] {
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const part of raw.split(/[,\s]+/)) {
+        const trimmed = part.trim();
+        if (!trimmed || seen.has(trimmed)) continue;
+        seen.add(trimmed);
+        out.push(trimmed);
+      }
+      return out;
+    }
     const nextRetailerCodes = {
-      coles: String(fd.get("retailer_coles") ?? "").trim() || null,
-      woolworths: String(fd.get("retailer_woolworths") ?? "").trim() || null,
-      aldi: String(fd.get("retailer_aldi") ?? "").trim() || null,
+      coles: parseCodes(String(fd.get("retailer_coles") ?? "")),
+      woolworths: parseCodes(String(fd.get("retailer_woolworths") ?? "")),
+      aldi: parseCodes(String(fd.get("retailer_aldi") ?? "")),
     };
     const snapshot = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
     qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
@@ -242,20 +253,22 @@ export function IngredientRow({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
-              <span className="w-20">Coles ID</span>
+              <span className="w-20 shrink-0">Coles IDs</span>
               <input
                 name="retailer_coles"
-                defaultValue={ingredient.retailer_codes.coles ?? ""}
-                placeholder="e.g. 329607"
+                defaultValue={ingredient.retailer_codes.coles.join(", ")}
+                placeholder="e.g. 329607, 440010"
+                title="Comma-separated when the same ingredient covers multiple SKUs"
                 className="flex-1 rounded-md border border-[var(--border)] bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
               />
             </label>
             <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
-              <span className="w-20">Woolies ID</span>
+              <span className="w-20 shrink-0">Woolies IDs</span>
               <input
                 name="retailer_woolworths"
-                defaultValue={ingredient.retailer_codes.woolworths ?? ""}
-                placeholder="e.g. 12345"
+                defaultValue={ingredient.retailer_codes.woolworths.join(", ")}
+                placeholder="e.g. 12345, 67890"
+                title="Comma-separated when the same ingredient covers multiple SKUs"
                 className="flex-1 rounded-md border border-[var(--border)] bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
               />
             </label>

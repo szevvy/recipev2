@@ -94,6 +94,7 @@ export type Database = {
         Insert: {
           ingredient_id: string;
           retailer: Retailer;
+          stock_code: string;
           price_cents?: number | null;
           regular_price_cents?: number | null;
           on_sale?: boolean;

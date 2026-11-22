@@ -34,8 +34,10 @@ export type RefreshResult =
   | { ok: false; error: string };
 
 type DatasetRow = {
-  recordType: "PRODUCT" | "NOTE";
-  retailer: Retailer;
+  // In practice the actor only sets recordType for NOTE rows — regular
+  // product rows omit the field, so we treat `undefined` as PRODUCT.
+  recordType?: "PRODUCT" | "NOTE" | string | null;
+  retailer?: string | null;
   productId?: string | null;
   title?: string | null;
   brand?: string | null;
@@ -56,6 +58,33 @@ type DatasetRow = {
 function toCents(n: number | null | undefined): number | null {
   if (n == null || !Number.isFinite(n)) return null;
   return Math.round(n * 100);
+}
+
+function normaliseRetailer(raw: string | null | undefined): Retailer | null {
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  if (lower === "coles") return "coles";
+  if (lower === "woolworths" || lower === "woolies") return "woolworths";
+  if (lower === "aldi") return "aldi";
+  return null;
+}
+
+// The actor sometimes omits `productId` from the row and only gives us a
+// URL. Extract the ID from the usual Coles/Woolies/ALDI product URL shapes.
+function productIdFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  // Coles: https://www.coles.com.au/product/<id>
+  // Woolies: https://www.woolworths.com.au/shop/productdetails/<id>
+  // ALDI: various, usually ends with a numeric slug
+  const m = url.match(/\/(?:product|productdetails)\/(\d+)/);
+  if (m) return m[1];
+  // Fallback — last numeric path segment.
+  const segments = url.split("?")[0].split("/").filter(Boolean);
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const seg = segments[i];
+    if (/^\d+$/.test(seg)) return seg;
+  }
+  return null;
 }
 
 export async function refreshPrices(): Promise<RefreshResult> {
@@ -148,23 +177,32 @@ export async function refreshPrices(): Promise<RefreshResult> {
   const errors: string[] = [];
 
   // Index results by (retailer, productId) so we can match back to codes.
+  // The actor:
+  //  - returns NOTE rows for out-of-stock items with recordType="NOTE";
+  //  - returns regular product rows WITHOUT a recordType field at all
+  //    (so we default to PRODUCT when it's missing);
+  //  - returns retailer in title case ("Coles" / "Woolworths") — we
+  //    lowercase to match our "coles:..." / "woolworths:..." keys;
+  //  - sometimes omits productId — we fall back to parsing the URL.
   const resultByKey = new Map<string, DatasetRow>();
   let products = 0;
   let notes = 0;
   for (const row of rows) {
-    if (row.recordType === "NOTE") {
+    const retailer = normaliseRetailer(row.retailer);
+    if (!retailer) continue;
+    const productId =
+      (row.productId && String(row.productId).trim()) ||
+      productIdFromUrl(row.url);
+    if (!productId) continue;
+    const key = `${retailer}:${productId}`;
+    const isNote = row.recordType === "NOTE";
+    if (isNote) {
       notes++;
-      if (row.retailer && row.productId) {
-        // Keep the NOTE around so we can mark it out of stock.
-        const key = `${row.retailer}:${row.productId}`;
-        if (!resultByKey.has(key)) resultByKey.set(key, row);
-      }
+      if (!resultByKey.has(key)) resultByKey.set(key, row);
       continue;
     }
-    if (row.recordType !== "PRODUCT") continue;
-    if (!row.retailer || !row.productId) continue;
     products++;
-    resultByKey.set(`${row.retailer}:${row.productId}`, row);
+    resultByKey.set(key, row);
   }
 
   // Upsert prices + count out-of-stocks. One row per (ingredient, retailer,
@@ -189,7 +227,9 @@ export async function refreshPrices(): Promise<RefreshResult> {
   const nowIso = new Date().toISOString();
   for (const [key, ref] of ingredientLookup) {
     const match = resultByKey.get(key) ?? null;
-    const isProduct = match?.recordType === "PRODUCT";
+    // Treat anything other than a NOTE as a product row (actor omits
+    // recordType for regular results).
+    const isProduct = !!match && match.recordType !== "NOTE";
     const inStock =
       isProduct && (match?.inStock ?? true) !== false;
     if (!inStock) outOfStock++;

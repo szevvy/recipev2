@@ -394,9 +394,6 @@ export function IngredientRow({
                 aria-label="Make from recipe"
               />
             )}
-            {!ingredient.linked_recipe_id && (
-              <RetailerCodeStatus ingredient={ingredient} />
-            )}
           </div>
           <PriceChips ingredientId={ingredient.id} size="sm" />
         </button>
@@ -423,49 +420,6 @@ export function IngredientRow({
         </div>
       )}
     </li>
-  );
-}
-
-// At-a-glance "which retailers have a stock code set" indicator — one
-// small favicon per retailer, full-colour when codes exist, dimmed /
-// outlined when still missing. Lets you scan the list and spot the
-// ingredients that need their IDs filled out without opening each row.
-function RetailerCodeStatus({ ingredient }: { ingredient: Ingredient }) {
-  const retailers: Array<{ key: Retailer; label: string; icon: string }> = [
-    {
-      key: "coles",
-      label: "Coles",
-      icon: "https://www.google.com/s2/favicons?domain=coles.com.au&sz=32",
-    },
-    {
-      key: "woolworths",
-      label: "Woolworths",
-      icon: "https://www.google.com/s2/favicons?domain=woolworths.com.au&sz=32",
-    },
-  ];
-  return (
-    <span className="inline-flex items-center gap-0.5 shrink-0">
-      {retailers.map((r) => {
-        const codes = ingredient.retailer_codes?.[r.key] ?? [];
-        const set = codes.length > 0;
-        return (
-          <img
-            key={r.key}
-            src={r.icon}
-            alt={r.label}
-            width={10}
-            height={10}
-            className={
-              "rounded-sm transition-opacity " +
-              (set
-                ? "opacity-90"
-                : "opacity-25 grayscale")
-            }
-            title={set ? `${r.label}: ${codes.join(", ")}` : `${r.label}: no code`}
-          />
-        );
-      })}
-    </span>
   );
 }
 

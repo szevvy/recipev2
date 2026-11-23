@@ -394,7 +394,9 @@ export function IngredientRow({
                 aria-label="Make from recipe"
               />
             )}
-            <RetailerCodeStatus ingredient={ingredient} />
+            {!ingredient.linked_recipe_id && (
+              <RetailerCodeStatus ingredient={ingredient} />
+            )}
           </div>
           <PriceChips ingredientId={ingredient.id} size="sm" />
         </button>

@@ -13,18 +13,24 @@ import {
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ShoppingItemState, ShoppingItemWithIngredient } from "@/lib/types";
+import type {
+  Ingredient,
+  ShoppingItemState,
+  ShoppingItemWithIngredient,
+} from "@/lib/types";
 import {
   BOOTSTRAP_KEY,
   useInvalidateBootstrap,
   type BootstrapData,
 } from "@/lib/queries";
 import {
+  promoteOneOffToIngredientAction,
   removeShoppingItemAction,
   setItemNotesAction,
   setItemStateAction,
 } from "./actions";
 import { StatePicker } from "./StatePicker";
+import { GroupCombobox } from "@/components/GroupCombobox";
 import { PriceChips } from "@/components/PriceChips";
 import { IngredientPricesDetail } from "@/components/IngredientPricesDetail";
 
@@ -43,10 +49,12 @@ export function ShoppingItemRow({
 }) {
   const [state, setState] = useState<ShoppingItemState>(item.state);
   const [removed, setRemoved] = useState(false);
+  const [promoting, setPromoting] = useState(false);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const invalidate = useInvalidateBootstrap();
   const qc = useQueryClient();
+  const isOneOff = !item.ingredient_id && !!item.name;
 
   useEffect(() => {
     setState(item.state);
@@ -107,6 +115,72 @@ export function ShoppingItemRow({
         }
         setError(result.error);
       }
+    });
+  }
+
+  function promote(groupName: string | null) {
+    setError(null);
+    const originalName = item.name ?? "";
+    startTransition(async () => {
+      const result = await promoteOneOffToIngredientAction(item.id, groupName);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      // Patch cache in-place so the row immediately renders as an
+      // ingredient-backed item (ingredient_id set, name cleared) and
+      // the newly-created ingredient shows up on the Ingredients tab.
+      qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
+        if (!old) return old;
+        const nowIso = new Date().toISOString();
+        const existingIngredient = old.ingredients.find(
+          (i) => i.id === result.ingredientId,
+        );
+        const newIngredient: Ingredient =
+          existingIngredient ?? {
+            id: result.ingredientId,
+            name: result.ingredientName,
+            group_name: result.groupName,
+            lists: [],
+            linked_recipe_id: null,
+            shelf_life_days: null,
+            retailer_codes: { coles: [], woolworths: [], aldi: [] },
+            retailer_weights: { coles: null, woolworths: null, aldi: null },
+            price_display_override: null,
+            staple_state: "not_checked",
+            created_at: nowIso,
+            updated_at: nowIso,
+          };
+        const nextIngredients = existingIngredient
+          ? old.ingredients
+          : [...old.ingredients, newIngredient].sort((a, b) =>
+              a.name.localeCompare(b.name),
+            );
+        return {
+          ...old,
+          ingredients: nextIngredients,
+          shoppingItems: old.shoppingItems.map((i) =>
+            i.id === item.id
+              ? {
+                  ...i,
+                  name: null,
+                  ingredient_id: result.ingredientId,
+                  ingredients: {
+                    id: newIngredient.id,
+                    name: newIngredient.name,
+                    group_name: newIngredient.group_name,
+                    linked_recipe_id: newIngredient.linked_recipe_id,
+                    shelf_life_days: newIngredient.shelf_life_days,
+                  },
+                }
+              : i,
+          ),
+        };
+      });
+      setPromoting(false);
+      // Close the inline modal and let the user know via console; the
+      // row will visibly re-group on the next render.
+      void originalName; // reserved for a toast if we add one later
     });
   }
 
@@ -196,10 +270,98 @@ export function ShoppingItemRow({
           onChange={update}
           onRemove={remove}
           canMake={!!item.ingredients?.linked_recipe_id}
+          onPromoteToIngredient={isOneOff ? () => setPromoting(true) : undefined}
         />
       </div>
       {expanded && <ExpandedPanel item={item} />}
+      {promoting && (
+        <PromoteOneOffModal
+          itemName={item.name ?? ""}
+          onCancel={() => {
+            setPromoting(false);
+            setError(null);
+          }}
+          onConfirm={(groupName) => promote(groupName)}
+        />
+      )}
     </li>
+  );
+}
+
+function PromoteOneOffModal({
+  itemName,
+  onCancel,
+  onConfirm,
+}: {
+  itemName: string;
+  onCancel: () => void;
+  onConfirm: (groupName: string | null) => void;
+}) {
+  const qc = useQueryClient();
+  const bootstrap = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
+  const groupSuggestions = (() => {
+    const set = new Set<string>();
+    for (const ing of bootstrap?.ingredients ?? []) {
+      if (ing.group_name && ing.group_name.trim()) set.add(ing.group_name.trim());
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  })();
+
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const raw = String(fd.get("group_name") ?? "").trim();
+    onConfirm(raw || null);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl bg-[var(--surface)] shadow-xl p-5 space-y-3"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div>
+          <h2 className="font-serif text-lg text-[var(--foreground)]">
+            Add as ingredient
+          </h2>
+          <p className="text-xs text-[var(--muted)] mt-0.5">
+            Promotes <span className="font-medium">{itemName}</span> into
+            the library so it can carry retailer codes + show up on the
+            ingredients tab.
+          </p>
+        </div>
+        <form onSubmit={onSubmit} className="space-y-3">
+          <label className="block">
+            <span className="text-xs text-[var(--muted)]">Group</span>
+            <div className="mt-0.5">
+              <GroupCombobox
+                name="group_name"
+                suggestions={groupSuggestions}
+                placeholder="e.g. Pantry"
+              />
+            </div>
+          </label>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-full border border-[var(--border)] bg-white text-sm px-3 py-1 hover:bg-[var(--surface-muted)]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="rounded-full bg-[var(--accent)] text-white text-sm px-3 py-1 hover:bg-[var(--accent-hover)] transition-colors"
+            >
+              Add
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 

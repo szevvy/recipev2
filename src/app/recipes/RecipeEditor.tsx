@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { GripVertical, Trash2, Save, X } from "lucide-react";
+import { Copy, GripVertical, Trash2, Save, X } from "lucide-react";
 import type { Ingredient, RecipeWithIngredients } from "@/lib/types";
 import { IngredientPicker } from "@/components/IngredientPicker";
 import {
+  copyRecipeAction,
   createRecipeAction,
   deleteRecipeAction,
   updateRecipeAction,
@@ -169,6 +170,23 @@ export function RecipeEditor({
         return;
       }
       router.push("/recipes");
+    });
+  }
+
+  const [copyModalOpen, setCopyModalOpen] = useState(false);
+
+  function onCopy(newName: string) {
+    if (!recipe) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await copyRecipeAction(recipe.id, newName);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setCopyModalOpen(false);
+      // Land on the new copy in edit mode so the user can tweak it.
+      router.push(`/recipes/${result.id}/edit`);
     });
   }
 
@@ -350,19 +368,29 @@ export function RecipeEditor({
         </p>
       )}
 
-      <div className="flex items-center justify-between gap-3">
-        {recipe ? (
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={pending}
-            className="inline-flex items-center gap-1 rounded-full border border-red-200 text-red-600 text-sm px-3 py-1.5 hover:bg-red-50 disabled:opacity-50"
-          >
-            <Trash2 size={14} /> Delete recipe
-          </button>
-        ) : (
-          <span />
-        )}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          {recipe && (
+            <>
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={pending}
+                className="inline-flex items-center gap-1 rounded-full border border-red-200 text-red-600 text-sm px-3 py-1.5 hover:bg-red-50 disabled:opacity-50"
+              >
+                <Trash2 size={14} /> Delete recipe
+              </button>
+              <button
+                type="button"
+                onClick={() => setCopyModalOpen(true)}
+                disabled={pending}
+                className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] text-[var(--foreground)] text-sm px-3 py-1.5 hover:bg-[var(--surface-muted)] disabled:opacity-50"
+              >
+                <Copy size={14} /> Copy recipe
+              </button>
+            </>
+          )}
+        </div>
         <button
           type="button"
           onClick={onSave}
@@ -371,6 +399,85 @@ export function RecipeEditor({
         >
           <Save size={14} /> {pending ? "Saving…" : recipe ? "Save changes" : "Create recipe"}
         </button>
+      </div>
+      {copyModalOpen && recipe && (
+        <CopyRecipeModal
+          defaultName={`Copy of ${recipe.name}`}
+          onCancel={() => setCopyModalOpen(false)}
+          onConfirm={onCopy}
+          pending={pending}
+        />
+      )}
+    </div>
+  );
+}
+
+function CopyRecipeModal({
+  defaultName,
+  onCancel,
+  onConfirm,
+  pending,
+}: {
+  defaultName: string;
+  onCancel: () => void;
+  onConfirm: (name: string) => void;
+  pending: boolean;
+}) {
+  const [name, setName] = useState(defaultName);
+
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onConfirm(trimmed);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl bg-[var(--surface)] shadow-xl p-5 space-y-3"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div>
+          <h2 className="font-serif text-lg text-[var(--foreground)]">
+            Copy recipe
+          </h2>
+          <p className="text-xs text-[var(--muted)] mt-0.5">
+            Duplicates the recipe (ingredients, times, notes) under a new
+            name. You&apos;ll land on the copy ready to edit.
+          </p>
+        </div>
+        <form onSubmit={onSubmit} className="space-y-3">
+          <label className="block">
+            <span className="text-xs text-[var(--muted)]">New name</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={100}
+              autoFocus
+              className="mt-0.5 w-full rounded-lg border border-[var(--border)] bg-white px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
+            />
+          </label>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-full border border-[var(--border)] bg-white text-sm px-3 py-1 hover:bg-[var(--surface-muted)]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending || !name.trim()}
+              className="rounded-full bg-[var(--accent)] text-white text-sm px-3 py-1 hover:bg-[var(--accent-hover)] disabled:opacity-60 transition-colors"
+            >
+              {pending ? "Copying…" : "Copy"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

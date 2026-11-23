@@ -226,6 +226,7 @@ export type Database = {
           unit_key?: string | null;
         };
         Update: {
+          ingredient_id?: string | null;
           name?: string | null;
           quantity?: string | null;
           state?: ShoppingItemState;

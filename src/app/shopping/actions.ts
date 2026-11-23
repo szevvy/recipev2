@@ -541,6 +541,80 @@ export async function addOneOffItemAction(
   return { ok: true };
 }
 
+// Promote a one-off shopping_items row (name-only, no ingredient_id)
+// into a real ingredient and link the row to it. Group name is applied
+// to the new ingredient so it lands in the right category next to the
+// user's other stuff. Returns the new ingredient's id so the caller
+// can patch its cache.
+export type PromoteOneOffResult =
+  | { ok: true; ingredientId: string; ingredientName: string; groupName: string | null }
+  | { ok: false; error: string };
+
+export async function promoteOneOffToIngredientAction(
+  shoppingItemId: string,
+  groupName: string | null,
+): Promise<PromoteOneOffResult> {
+  const supabase = supabaseAdmin();
+  const { data: row, error: readErr } = await supabase
+    .from("shopping_items")
+    .select("id, name, ingredient_id")
+    .eq("id", shoppingItemId)
+    .maybeSingle();
+  if (readErr) return { ok: false, error: readErr.message };
+  if (!row) return { ok: false, error: "Not found" };
+  if (row.ingredient_id) {
+    return { ok: false, error: "This row is already linked to an ingredient" };
+  }
+  const name = (row.name ?? "").trim();
+  if (!name) return { ok: false, error: "Row has no name" };
+  const group = groupName?.trim() ? groupName.trim() : null;
+
+  // Does an ingredient with this name already exist (case-insensitive)?
+  // If so, link to it rather than creating a duplicate.
+  const { data: existing, error: existingErr } = await supabase
+    .from("ingredients")
+    .select("id, name, group_name")
+    .ilike("name", name)
+    .maybeSingle();
+  if (existingErr) return { ok: false, error: existingErr.message };
+
+  let ingredientId: string;
+  let finalName: string;
+  let finalGroup: string | null;
+  if (existing) {
+    ingredientId = existing.id;
+    finalName = existing.name;
+    finalGroup = existing.group_name;
+  } else {
+    const { data: inserted, error: insertErr } = await supabase
+      .from("ingredients")
+      .insert({ name, group_name: group })
+      .select("id, name, group_name")
+      .single();
+    if (insertErr || !inserted) {
+      return { ok: false, error: insertErr?.message ?? "insert failed" };
+    }
+    ingredientId = inserted.id;
+    finalName = inserted.name;
+    finalGroup = inserted.group_name;
+  }
+
+  // Point the shopping_items row at the (new or matched) ingredient
+  // and clear the one-off name so it renders as a normal row.
+  const { error: linkErr } = await supabase
+    .from("shopping_items")
+    .update({ ingredient_id: ingredientId, name: null })
+    .eq("id", shoppingItemId);
+  if (linkErr) return { ok: false, error: linkErr.message };
+
+  return {
+    ok: true,
+    ingredientId,
+    ingredientName: finalName,
+    groupName: finalGroup,
+  };
+}
+
 // Finish shopping:
 //   1. Record every bought item in purchase_history (one row per bought item).
 //   2. Flip bought -> have on meal/manual rows so they persist as pantry stock

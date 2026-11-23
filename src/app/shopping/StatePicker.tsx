@@ -10,6 +10,7 @@ import {
   Home,
   Package,
   ShoppingBasket,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import type { ShoppingItemState } from "@/lib/types";
@@ -78,6 +79,7 @@ export function StatePicker({
   canMake = false,
   variant = "shopping",
   onNeedMore,
+  onPromoteToIngredient,
 }: {
   state: ShoppingItemState;
   onChange: (next: PickState) => void;
@@ -90,6 +92,9 @@ export function StatePicker({
   // and offers "Need to buy 2+" that opens a quantity picker via onNeedMore.
   variant?: "shopping" | "list";
   onNeedMore?: () => void;
+  // Set on one-off shopping rows ({ name }) to offer "Add as ingredient"
+  // — promotes the row into the library + links it.
+  onPromoteToIngredient?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -153,6 +158,23 @@ export function StatePicker({
               </li>
             );
           })}
+          {onPromoteToIngredient && (
+            <li className="border-t border-[var(--border)]/60 mt-1 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onPromoteToIngredient();
+                  setOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-[var(--accent-soft)]"
+              >
+                <Sparkles size={14} className="text-[var(--accent)]" />
+                <span className="flex-1 text-[var(--foreground)]">
+                  Add as ingredient…
+                </span>
+              </button>
+            </li>
+          )}
           {variant === "list" && onNeedMore && (
             <li>
               <button

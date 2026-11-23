@@ -199,6 +199,76 @@ export async function deleteRecipeAction(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+// Duplicate a recipe (rows + ingredient links) under a new name. The
+// copy keeps every field from the source, just rebinds the ingredient
+// rows to the new recipe id.
+export async function copyRecipeAction(
+  id: string,
+  rawName: string,
+): Promise<ActionResult<{ id: string }>> {
+  const name = rawName.trim();
+  if (!name) return { ok: false, error: "Give the copy a name" };
+  if (name.length > 100) return { ok: false, error: "Name too long" };
+
+  const supabase = supabaseAdmin();
+  const { data: source, error: srcErr } = await supabase
+    .from("recipes")
+    .select(
+      "name, instructions, source_url, default_servings, prep_minutes, cook_minutes, image_url, notes",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (srcErr) return { ok: false, error: srcErr.message };
+  if (!source) return { ok: false, error: "Source recipe not found" };
+
+  const { data: ings, error: ingsErr } = await supabase
+    .from("recipe_ingredients")
+    .select("ingredient_id, quantity, note, sort_order")
+    .eq("recipe_id", id);
+  if (ingsErr) return { ok: false, error: ingsErr.message };
+
+  const { data: copy, error: insErr } = await supabase
+    .from("recipes")
+    .insert({
+      name,
+      instructions: source.instructions,
+      source_url: source.source_url,
+      default_servings: source.default_servings,
+      prep_minutes: source.prep_minutes,
+      cook_minutes: source.cook_minutes,
+      image_url: source.image_url,
+      notes: source.notes,
+    })
+    .select("id")
+    .single();
+  if (insErr || !copy) {
+    if (insErr?.code === "23505") {
+      return { ok: false, error: `"${name}" already exists.` };
+    }
+    return { ok: false, error: insErr?.message ?? "Copy failed" };
+  }
+
+  if (ings && ings.length > 0) {
+    const rows = ings.map((ing) => ({
+      recipe_id: copy.id,
+      ingredient_id: ing.ingredient_id,
+      quantity: ing.quantity,
+      note: ing.note,
+      sort_order: ing.sort_order,
+    }));
+    const { error: linkErr } = await supabase
+      .from("recipe_ingredients")
+      .insert(rows);
+    if (linkErr) {
+      // Roll back the new recipe if ingredient copy failed.
+      await supabase.from("recipes").delete().eq("id", copy.id);
+      return { ok: false, error: linkErr.message };
+    }
+  }
+
+  return { ok: true, id: copy.id };
+}
+
 export async function quickCreateIngredientAction(
   name: string,
 ): Promise<ActionResult<{ ingredient: Ingredient }>> {

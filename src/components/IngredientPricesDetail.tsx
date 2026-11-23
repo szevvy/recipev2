@@ -177,6 +177,16 @@ export function IngredientPricesDetail({
                               )}
                           </span>
                         )}
+                        {/* Was-price (pack) when on sale. Rendered in the
+                            pack column so it sits next to the pack price. */}
+                        {priceDisplay !== "per_kg" &&
+                          p.on_sale &&
+                          p.regular_price_cents != null &&
+                          p.regular_price_cents > p.price_cents && (
+                            <span className="line-through text-[var(--muted)]/70 font-normal">
+                              ${(p.regular_price_cents / 100).toFixed(2)}
+                            </span>
+                          )}
                         {/* Unit price. Hidden in "pack" mode. */}
                         {priceDisplay !== "pack" &&
                           p.unit_price_cents != null &&
@@ -189,6 +199,23 @@ export function IngredientPricesDetail({
                               }
                             >
                               ${(p.unit_price_cents / 100).toFixed(2)}/{p.unit_of_measure}
+                            </span>
+                          )}
+                        {/* Was-price (per unit) when on sale. */}
+                        {priceDisplay !== "pack" &&
+                          p.on_sale &&
+                          p.regular_price_cents != null &&
+                          p.regular_price_cents > p.price_cents &&
+                          p.unit_price_cents != null &&
+                          p.unit_of_measure && (
+                            <span className="line-through text-[var(--muted)]/70 font-normal">
+                              $
+                              {(
+                                (p.unit_price_cents * p.regular_price_cents) /
+                                p.price_cents /
+                                100
+                              ).toFixed(2)}
+                              /{p.unit_of_measure}
                             </span>
                           )}
                         {p.on_sale && (

@@ -18,6 +18,10 @@ export type ChipGroup = {
     variantHint: string | null;
   }[];
   priceLabel: string;
+  // Was-price for sales — rendered crossed-out so you can see the
+  // discount size at a glance. Null outside sale context or when the
+  // merge across retailers disagrees on the regular price.
+  regularLabel: string | null;
   cheapest: boolean;
   outOfStock: boolean;
   // Only true when every retailer in the group is on sale — avoids
@@ -73,6 +77,12 @@ export function usePriceChipsFor(ingredientId: string | null): ChipGroup[] {
     bestUnitCents: number | null;
     bestUnitOfMeasure: string | null;
     bestPackCents: number | null;
+    // Regular price fields, non-null only when the best variant is on
+    // sale AND we have a regular pack price from the actor. Regular
+    // unit price is derived via the pack/unit ratio of the live variant
+    // (same SKU weight, just scaled).
+    bestRegularPackCents: number | null;
+    bestRegularUnitCents: number | null;
     bestVariantTitle: string | null;
     variantCount: number;
     onSale: boolean;
@@ -139,11 +149,30 @@ export function usePriceChipsFor(ingredientId: string | null): ChipGroup[] {
       );
       bestUnitOfMeasure = "kg";
     }
+    let bestRegularPackCents: number | null = null;
+    let bestRegularUnitCents: number | null = null;
+    if (
+      bestVariant &&
+      bestVariant.on_sale &&
+      bestVariant.regular_price_cents != null &&
+      bestVariant.price_cents != null &&
+      bestVariant.regular_price_cents > bestVariant.price_cents
+    ) {
+      bestRegularPackCents = bestVariant.regular_price_cents;
+      if (bestUnitCents != null && bestVariant.price_cents > 0) {
+        bestRegularUnitCents = Math.round(
+          (bestUnitCents * bestVariant.regular_price_cents) /
+            bestVariant.price_cents,
+        );
+      }
+    }
     pricings.push({
       retailer,
       bestUnitCents,
       bestUnitOfMeasure,
       bestPackCents: bestVariant?.price_cents ?? null,
+      bestRegularPackCents,
+      bestRegularUnitCents,
       bestVariantTitle: bestVariant?.product_title ?? null,
       variantCount: bucket.length,
       onSale: !!bestVariant?.on_sale,
@@ -191,15 +220,34 @@ export function usePriceChipsFor(ingredientId: string | null): ChipGroup[] {
         p.bestUnitCents != null && p.bestUnitOfMeasure
           ? `$${(p.bestUnitCents / 100).toFixed(2)}/${p.bestUnitOfMeasure}`
           : null;
+      const regularPackLabel =
+        p.bestRegularPackCents != null
+          ? `$${(p.bestRegularPackCents / 100).toFixed(2)}`
+          : null;
+      const regularUnitLabel =
+        p.bestRegularUnitCents != null && p.bestUnitOfMeasure
+          ? `$${(p.bestRegularUnitCents / 100).toFixed(2)}/${p.bestUnitOfMeasure}`
+          : null;
       let priceLabel: string;
+      let regularLabel: string | null;
       if (priceDisplay === "pack") {
         priceLabel = packLabel ?? unitLabel ?? "—";
+        regularLabel =
+          priceLabel === packLabel ? regularPackLabel : regularUnitLabel;
       } else if (priceDisplay === "per_kg") {
         priceLabel = unitLabel ?? packLabel ?? "—";
+        regularLabel =
+          priceLabel === unitLabel ? regularUnitLabel : regularPackLabel;
       } else if (packLabel && unitLabel) {
         priceLabel = `${packLabel} · ${unitLabel}`;
+        regularLabel =
+          regularPackLabel && regularUnitLabel
+            ? `${regularPackLabel} · ${regularUnitLabel}`
+            : null;
       } else {
         priceLabel = unitLabel ?? packLabel ?? "—";
+        regularLabel =
+          priceLabel === unitLabel ? regularUnitLabel : regularPackLabel;
       }
       const cheapest =
         !p.outOfStock &&
@@ -209,6 +257,7 @@ export function usePriceChipsFor(ingredientId: string | null): ChipGroup[] {
         retailer: p.retailer,
         icon: RETAILER_ICON[p.retailer],
         priceLabel,
+        regularLabel,
         variantHint:
           p.variantCount > 1 && p.bestVariantTitle ? p.bestVariantTitle : null,
         cheapest,
@@ -238,6 +287,11 @@ export function usePriceChipsFor(ingredientId: string | null): ChipGroup[] {
       });
       existing.onSale = existing.onSale && c.onSale;
       existing.cheapest = existing.cheapest || c.cheapest;
+      // Keep the was-price only when every merged retailer agrees on
+      // it; otherwise one retailer's "was" would be misleading.
+      if (existing.regularLabel !== c.regularLabel) {
+        existing.regularLabel = null;
+      }
       existing.title = `${existing.title}\n\n${c.title}`;
     } else {
       groups.set(key, {
@@ -250,6 +304,7 @@ export function usePriceChipsFor(ingredientId: string | null): ChipGroup[] {
           },
         ],
         priceLabel: c.priceLabel,
+        regularLabel: c.regularLabel,
         cheapest: c.cheapest,
         outOfStock: c.outOfStock,
         onSale: c.onSale,
@@ -356,7 +411,14 @@ export function PriceChips({
             {g.outOfStock ? (
               <span className="line-through">OOS</span>
             ) : g.showPrice ? (
-              <span>{g.priceLabel}</span>
+              <>
+                <span>{g.priceLabel}</span>
+                {g.regularLabel && (
+                  <span className="line-through text-[var(--muted)]/70 font-normal">
+                    {g.regularLabel}
+                  </span>
+                )}
+              </>
             ) : null}
             {soloVariantHint && !g.outOfStock && (
               <span className="italic text-[var(--muted)] truncate max-w-[12ch]">

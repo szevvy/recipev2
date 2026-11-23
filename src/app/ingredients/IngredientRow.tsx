@@ -3,7 +3,13 @@
 import { useEffect, useState, useTransition } from "react";
 import { ChefHat, Pencil, Trash2, Check, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { Ingredient, IngredientPrice, Recipe, Retailer } from "@/lib/types";
+import type {
+  Ingredient,
+  IngredientPrice,
+  PriceDisplay,
+  Recipe,
+  Retailer,
+} from "@/lib/types";
 import { ListPicker } from "@/components/ListPicker";
 import { LinkedRecipePicker } from "@/components/LinkedRecipePicker";
 import { GroupCombobox } from "@/components/GroupCombobox";
@@ -104,6 +110,13 @@ export function IngredientRow({
       woolworths: parseWeight(String(fd.get("weight_g_woolworths") ?? "")),
       aldi: parseWeight(String(fd.get("weight_g_aldi") ?? "")),
     };
+    const rawDisplay = String(fd.get("price_display_override") ?? "").trim();
+    const nextPriceDisplayOverride: PriceDisplay | null =
+      rawDisplay === "pack" ||
+      rawDisplay === "per_kg" ||
+      rawDisplay === "both"
+        ? rawDisplay
+        : null;
     const snapshot = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
     qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
       if (!old) return old;
@@ -118,6 +131,7 @@ export function IngredientRow({
                 linked_recipe_id: nextLinkedRecipeId,
                 retailer_codes: nextRetailerCodes,
                 retailer_weights: nextRetailerWeights,
+                price_display_override: nextPriceDisplayOverride,
                 updated_at: new Date().toISOString(),
               }
             : i,
@@ -263,6 +277,20 @@ export function IngredientRow({
                 className="w-14 rounded-md border border-[var(--border)] bg-white px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
               />
               <span>days</span>
+            </label>
+            <label className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)]">
+              <span>Price display</span>
+              <select
+                name="price_display_override"
+                defaultValue={ingredient.price_display_override ?? ""}
+                title="Overrides the group default. Leave on 'Group default' for most ingredients."
+                className="rounded-md border border-[var(--border)] bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
+              >
+                <option value="">Group default</option>
+                <option value="pack">Pack only</option>
+                <option value="per_kg">$/kg only</option>
+                <option value="both">Both</option>
+              </select>
             </label>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

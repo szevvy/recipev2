@@ -20,10 +20,14 @@ import type {
   WeekStart,
 } from "./types";
 
-// Row shape as stored in Postgres — the `lists` and `retailer_codes`
-// fields on the client-side Ingredient type are populated by the bootstrap
-// API from separate tables and are not columns here.
-type IngredientRow = Omit<Ingredient, "lists" | "retailer_codes">;
+// Row shape as stored in Postgres — the `lists`, `retailer_codes`, and
+// `retailer_weights` fields on the client-side Ingredient type are
+// populated by the bootstrap API from separate tables and are not
+// columns here.
+type IngredientRow = Omit<
+  Ingredient,
+  "lists" | "retailer_codes" | "retailer_weights"
+>;
 
 type IngredientInsert = {
   id?: string;
@@ -31,6 +35,7 @@ type IngredientInsert = {
   group_name?: string | null;
   linked_recipe_id?: string | null;
   shelf_life_days?: number | null;
+  price_display_override?: "pack" | "per_kg" | "both" | null;
   staple_state?: StapleState;
 };
 
@@ -265,10 +270,12 @@ export type Database = {
           name: string;
           color?: string | null;
           sort_order?: number;
+          price_display?: "pack" | "per_kg" | "both";
         };
         Update: {
           color?: string | null;
           sort_order?: number;
+          price_display?: "pack" | "per_kg" | "both";
         };
         Relationships: [];
       };

@@ -1,5 +1,12 @@
 export type StapleState = "not_checked" | "need" | "have";
 
+// Which price the chips show for an ingredient. Default is set per
+// group on category_meta; each ingredient can override.
+//  - "pack"   : pack price only ("$4.75")
+//  - "per_kg" : unit price only ("$37/kg")
+//  - "both"   : pack + unit price side-by-side (current behaviour)
+export type PriceDisplay = "pack" | "per_kg" | "both";
+
 export type Ingredient = {
   id: string;
   name: string;
@@ -31,6 +38,8 @@ export type Ingredient = {
     woolworths: number | null;
     aldi: number | null;
   };
+  // Null → inherit from category_meta[group_name].price_display.
+  price_display_override: PriceDisplay | null;
   staple_state: StapleState;
   created_at: string;
   updated_at: string;
@@ -181,6 +190,10 @@ export type CategoryMetaRow = {
   name: string;
   color: string | null;
   sort_order: number;
+  // Default chip display for ingredients in this group. Falls back to
+  // "both" when no row exists (ingredients.price_display_override can
+  // still override on a case-by-case basis — e.g. rice bags).
+  price_display: PriceDisplay;
   updated_at: string;
 };
 

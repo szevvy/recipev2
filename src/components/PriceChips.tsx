@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { BOOTSTRAP_KEY, type BootstrapData } from "@/lib/queries";
+import { resolvePriceDisplay } from "@/lib/price-display";
 import type { Retailer } from "@/lib/types";
 
 // A chip group: one price label, one or more retailer icons. When two
@@ -51,6 +52,10 @@ export function usePriceChipsFor(ingredientId: string | null): ChipGroup[] {
     (i) => i.id === ingredientId,
   );
   const weights = ingredient?.retailer_weights ?? null;
+  const priceDisplay = resolvePriceDisplay(
+    ingredient ?? null,
+    bootstrap?.categoryMeta ?? null,
+  );
 
   // Group by retailer and collapse variants: one chip per retailer. We
   // prefer unit price ($/kg etc.) for cheapest decisions so a smaller
@@ -175,13 +180,27 @@ export function usePriceChipsFor(ingredientId: string | null): ChipGroup[] {
     .slice()
     .sort((a, b) => a.retailer.localeCompare(b.retailer))
     .map((p) => {
-      // Primary chip label: unit price when we've got one, pack price otherwise.
-      const priceLabel =
+      // Primary chip label depends on the resolved price-display mode:
+      //  - "pack"   → pack price only
+      //  - "per_kg" → unit price only (falls back to pack if we have no
+      //               unit price AND no weight to derive one from)
+      //  - "both"   → unit price when available, pack otherwise
+      const packLabel =
+        p.bestPackCents != null ? `$${(p.bestPackCents / 100).toFixed(2)}` : null;
+      const unitLabel =
         p.bestUnitCents != null && p.bestUnitOfMeasure
           ? `$${(p.bestUnitCents / 100).toFixed(2)}/${p.bestUnitOfMeasure}`
-          : p.bestPackCents != null
-          ? `$${(p.bestPackCents / 100).toFixed(2)}`
-          : "—";
+          : null;
+      let priceLabel: string;
+      if (priceDisplay === "pack") {
+        priceLabel = packLabel ?? unitLabel ?? "—";
+      } else if (priceDisplay === "per_kg") {
+        priceLabel = unitLabel ?? packLabel ?? "—";
+      } else if (packLabel && unitLabel) {
+        priceLabel = `${packLabel} · ${unitLabel}`;
+      } else {
+        priceLabel = unitLabel ?? packLabel ?? "—";
+      }
       const cheapest =
         !p.outOfStock &&
         ((cheapestUnit != null && p.bestUnitCents === cheapestUnit) ||

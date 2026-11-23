@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import { BOOTSTRAP_KEY, type BootstrapData } from "@/lib/queries";
+import { resolvePriceDisplay } from "@/lib/price-display";
 import type { IngredientPrice, Retailer } from "@/lib/types";
 
 const RETAILER_ICON: Record<Retailer, string> = {
@@ -87,6 +88,10 @@ export function IngredientPricesDetail({
     (i) => i.id === ingredientId,
   );
   const weights = ingredient?.retailer_weights ?? null;
+  const priceDisplay = resolvePriceDisplay(
+    ingredient ?? null,
+    bootstrap?.categoryMeta ?? null,
+  );
 
   const byRetailer = new Map<Retailer, IngredientPrice[]>();
   for (const p of prices) {
@@ -158,19 +163,34 @@ export function IngredientPricesDetail({
                   <div className="flex items-baseline gap-2 shrink-0 tabular-nums">
                     {p.price_cents != null ? (
                       <>
-                        <span className="font-medium">
-                          ${(p.price_cents / 100).toFixed(2)}
-                          {p.unit_price_cents != null && p.unit_of_measure && (
-                            <span className="text-[var(--muted)] font-normal">
-                              /{formatPackSize(p.price_cents, p.unit_price_cents, p.unit_of_measure)}
-                            </span>
-                          )}
-                        </span>
-                        {p.unit_price_cents != null && p.unit_of_measure && (
-                          <span className="text-[var(--muted)]">
-                            ${(p.unit_price_cents / 100).toFixed(2)}/{p.unit_of_measure}
+                        {/* Pack price (with pack-size annotation when unit
+                            price exists). Hidden in "per_kg" mode. */}
+                        {priceDisplay !== "per_kg" && (
+                          <span className="font-medium">
+                            ${(p.price_cents / 100).toFixed(2)}
+                            {priceDisplay === "both" &&
+                              p.unit_price_cents != null &&
+                              p.unit_of_measure && (
+                                <span className="text-[var(--muted)] font-normal">
+                                  /{formatPackSize(p.price_cents, p.unit_price_cents, p.unit_of_measure)}
+                                </span>
+                              )}
                           </span>
                         )}
+                        {/* Unit price. Hidden in "pack" mode. */}
+                        {priceDisplay !== "pack" &&
+                          p.unit_price_cents != null &&
+                          p.unit_of_measure && (
+                            <span
+                              className={
+                                priceDisplay === "per_kg"
+                                  ? "font-medium"
+                                  : "text-[var(--muted)]"
+                              }
+                            >
+                              ${(p.unit_price_cents / 100).toFixed(2)}/{p.unit_of_measure}
+                            </span>
+                          )}
                         {p.on_sale && (
                           <span className="text-[9px] uppercase tracking-wide text-[var(--sage)]">
                             sale

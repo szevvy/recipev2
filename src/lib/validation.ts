@@ -71,6 +71,17 @@ export const IngredientInputSchema = z.object({
       woolworths: parseWeightG(v?.woolworths ?? null),
       aldi: parseWeightG(v?.aldi ?? null),
     })),
+  // Chip display override. "" / "group" → null (use group default).
+  price_display_override: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((v) => {
+      if (!v) return null;
+      const t = v.trim().toLowerCase();
+      if (t === "pack" || t === "per_kg" || t === "both") return t;
+      return null;
+    }),
 });
 
 function parseWeightG(raw: string | null | undefined): number | null {
@@ -130,6 +141,7 @@ export function parseIngredientForm(fd: FormData): IngredientInput {
       woolworths: String(fd.get("weight_g_woolworths") ?? ""),
       aldi: String(fd.get("weight_g_aldi") ?? ""),
     },
+    price_display_override: String(fd.get("price_display_override") ?? ""),
   };
   return IngredientInputSchema.parse(raw);
 }

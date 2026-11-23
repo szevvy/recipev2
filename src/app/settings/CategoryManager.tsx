@@ -3,14 +3,23 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ChevronDown, GripVertical, X } from "lucide-react";
 import { CATEGORY_PALETTE, paletteColor } from "@/lib/category-palette";
+import type { PriceDisplay } from "@/lib/types";
 import {
   setCategoryColorAction,
   setCategoryOrderAction,
+  setCategoryPriceDisplayAction,
 } from "./category-actions";
 
 export type CategoryRow = {
   name: string;
   color: string | null;
+  price_display: PriceDisplay;
+};
+
+const PRICE_DISPLAY_LABEL: Record<PriceDisplay, string> = {
+  pack: "Pack price",
+  per_kg: "$/kg",
+  both: "Both",
 };
 
 export function CategoryManager({ categories }: { categories: CategoryRow[] }) {
@@ -36,6 +45,16 @@ export function CategoryManager({ categories }: { categories: CategoryRow[] }) {
     setOrder((prev) => prev.map((c) => (c.name === name ? { ...c, color } : c)));
     startTransition(async () => {
       const result = await setCategoryColorAction(name, color);
+      if (!result.ok) setError(result.error);
+    });
+  }
+
+  function setPriceDisplay(name: string, price_display: PriceDisplay) {
+    setOrder((prev) =>
+      prev.map((c) => (c.name === name ? { ...c, price_display } : c)),
+    );
+    startTransition(async () => {
+      const result = await setCategoryPriceDisplayAction(name, price_display);
       if (!result.ok) setError(result.error);
     });
   }
@@ -108,7 +127,22 @@ export function CategoryManager({ categories }: { categories: CategoryRow[] }) {
               </button>
             </div>
             <CategoryName name={cat.name} color={cat.color} />
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              <label className="text-xs text-[var(--muted)] inline-flex items-center gap-1">
+                <span className="hidden sm:inline">Show</span>
+                <select
+                  value={cat.price_display}
+                  onChange={(e) =>
+                    setPriceDisplay(cat.name, e.target.value as PriceDisplay)
+                  }
+                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]"
+                  title="Default price display for ingredients in this group"
+                >
+                  <option value="pack">{PRICE_DISPLAY_LABEL.pack}</option>
+                  <option value="per_kg">{PRICE_DISPLAY_LABEL.per_kg}</option>
+                  <option value="both">{PRICE_DISPLAY_LABEL.both}</option>
+                </select>
+              </label>
               <ColorPickerButton
                 name={cat.name}
                 color={cat.color}

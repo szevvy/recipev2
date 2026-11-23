@@ -66,6 +66,7 @@ export function AddIngredientForm({
       shelf_life_days: shelfLifeDays,
       retailer_codes: { coles: [], woolworths: [], aldi: [] },
       retailer_weights: { coles: null, woolworths: null, aldi: null },
+      price_display_override: null,
       staple_state: "not_checked",
       created_at: nowIso,
       updated_at: nowIso,

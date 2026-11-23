@@ -2,8 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
+import type { PriceDisplay } from "@/lib/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+function isPriceDisplay(v: unknown): v is PriceDisplay {
+  return v === "pack" || v === "per_kg" || v === "both";
+}
 
 export async function setCategoryColorAction(
   name: string,
@@ -41,6 +46,44 @@ export async function setCategoryColorAction(
     if (error) return { ok: false, error: error.message };
   }
 
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function setCategoryPriceDisplayAction(
+  name: string,
+  priceDisplay: PriceDisplay,
+): Promise<ActionResult> {
+  if (!isPriceDisplay(priceDisplay)) {
+    return { ok: false, error: "Invalid price display" };
+  }
+  const supabase = supabaseAdmin();
+  const { data: existing } = await supabase
+    .from("category_meta")
+    .select("name")
+    .eq("name", name)
+    .maybeSingle();
+  if (existing) {
+    const { error } = await supabase
+      .from("category_meta")
+      .update({ price_display: priceDisplay })
+      .eq("name", name);
+    if (error) return { ok: false, error: error.message };
+  } else {
+    // Place new rows at the end so order is preserved — same pattern as
+    // setCategoryColorAction.
+    const { data: maxRow } = await supabase
+      .from("category_meta")
+      .select("sort_order")
+      .order("sort_order", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const nextOrder = (maxRow?.sort_order ?? -1) + 1;
+    const { error } = await supabase
+      .from("category_meta")
+      .insert({ name, price_display: priceDisplay, sort_order: nextOrder });
+    if (error) return { ok: false, error: error.message };
+  }
   revalidatePath("/settings");
   return { ok: true };
 }

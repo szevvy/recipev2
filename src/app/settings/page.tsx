@@ -44,6 +44,7 @@ export default async function SettingsPage() {
   const categories: CategoryRow[] = Array.from(groupNames).map((name) => ({
     name,
     color: metaByName.get(name)?.color ?? null,
+    price_display: metaByName.get(name)?.price_display ?? "both",
   }));
 
   // Sort by sort_order (lower first), fall back to alphabetical when no meta.
@@ -120,6 +121,8 @@ export default async function SettingsPage() {
             <p className="text-xs text-[var(--muted)] mt-0.5">
               Reorder with drag or arrows — top of this list is top of the shopping list.
               Pick a colour chip for each to colour-code the shopping sections.
+              &ldquo;Show&rdquo; sets the default price chip for the group
+              (per-ingredient override on each ingredient).
             </p>
           </div>
           {ingredientsErr || metaErr ? (

@@ -259,13 +259,14 @@ export async function refreshPrices(): Promise<RefreshResult> {
       isProduct && match?.unitPrice != null
         ? toCents(match.unitPrice as number)
         : null;
-    // actor emits "1kg" / "100g" / "1L" etc. — normalise to a lowercase
-    // key that drops the leading "1" so the display + comparator can
-    // group by "kg" vs "100g" directly.
+    // actor emits "1kg" / "100g" / "1L" etc. — strip a bare leading "1"
+    // ("1kg" → "kg") so the display + comparator can group by "kg"
+    // vs "100g" cleanly. The negative lookahead keeps "100g" intact —
+    // the old regex was gobbling the 1 off "100g", leaving "00g".
     const rawUnitOfMeasure =
       isProduct && match?.unitOfMeasure ? String(match.unitOfMeasure) : null;
     const unitOfMeasure = rawUnitOfMeasure
-      ? rawUnitOfMeasure.replace(/^1\s*/i, "").trim().toLowerCase()
+      ? rawUnitOfMeasure.replace(/^1(?!\d)\s*/i, "").trim().toLowerCase()
       : null;
     upserts.push({
       ingredient_id: ref.ingredient_id,

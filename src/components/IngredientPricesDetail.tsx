@@ -17,7 +17,8 @@ const RETAILER_LABEL: Record<Retailer, string> = {
 };
 
 // Derive pack size from pack + unit price (e.g. $7.40 pack @ $37/kg → 200g).
-// Converts sub-1 kg/L into g/ml so "200g" reads better than "0.2kg".
+// Normalises every weight/volume uom into grams/ml internally, then picks
+// a human unit on the way out (sub-1000g → g, otherwise kg; same for ml/L).
 function formatPackSize(
   packCents: number,
   unitCents: number,
@@ -26,14 +27,36 @@ function formatPackSize(
   if (unitCents <= 0) return "";
   const packInUom = packCents / unitCents;
   const u = uom.toLowerCase();
-  if (u === "kg") {
-    if (packInUom < 1) return `${Math.round(packInUom * 1000)}g`;
-    return `${packInUom >= 10 ? packInUom.toFixed(0) : packInUom.toFixed(1)}kg`;
+
+  const gramsPerUom: Record<string, number> = {
+    kg: 1000,
+    "100g": 100,
+    "10g": 10,
+    g: 1,
+  };
+  const mlPerUom: Record<string, number> = {
+    l: 1000,
+    "100ml": 100,
+    "10ml": 10,
+    ml: 1,
+  };
+  if (u in gramsPerUom) {
+    const grams = packInUom * gramsPerUom[u];
+    if (grams >= 1000) {
+      const kg = grams / 1000;
+      return `${kg >= 10 ? kg.toFixed(0) : kg.toFixed(1)}kg`;
+    }
+    return `${Math.round(grams)}g`;
   }
-  if (u === "l") {
-    if (packInUom < 1) return `${Math.round(packInUom * 1000)}ml`;
-    return `${packInUom >= 10 ? packInUom.toFixed(0) : packInUom.toFixed(1)}L`;
+  if (u in mlPerUom) {
+    const ml = packInUom * mlPerUom[u];
+    if (ml >= 1000) {
+      const l = ml / 1000;
+      return `${l >= 10 ? l.toFixed(0) : l.toFixed(1)}L`;
+    }
+    return `${Math.round(ml)}ml`;
   }
+  // Unknown uom — fall back to raw number + whatever label we got.
   if (packInUom >= 10) return `${packInUom.toFixed(0)}${uom}`;
   if (packInUom >= 1) return `${packInUom.toFixed(1)}${uom}`;
   return `${packInUom.toFixed(2)}${uom}`;

@@ -426,7 +426,7 @@ export function PriceChips({
                 · {soloVariantHint}
               </span>
             )}
-            {g.onSale && !g.outOfStock && (
+            {g.onSale && !g.outOfStock && !g.regularLabel && (
               <span className="text-[9px] uppercase tracking-wide text-[var(--sage)]">
                 sale
               </span>

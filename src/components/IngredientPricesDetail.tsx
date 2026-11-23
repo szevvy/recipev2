@@ -217,11 +217,15 @@ export function IngredientPricesDetail({
                               ${(p.unit_price_cents / 100).toFixed(2)}/{p.unit_of_measure}
                             </span>
                           )}
-                        {p.on_sale && (
-                          <span className="text-[9px] uppercase tracking-wide text-[var(--sage)]">
-                            sale
-                          </span>
-                        )}
+                        {p.on_sale &&
+                          !(
+                            p.regular_price_cents != null &&
+                            p.regular_price_cents > p.price_cents
+                          ) && (
+                            <span className="text-[9px] uppercase tracking-wide text-[var(--sage)]">
+                              sale
+                            </span>
+                          )}
                       </>
                     ) : (
                       <span className="line-through text-[var(--muted)]">OOS</span>

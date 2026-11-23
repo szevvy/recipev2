@@ -32,16 +32,20 @@ type RecipeOption = Pick<
   "id" | "name" | "image_url" | "default_servings" | "prep_minutes" | "cook_minutes"
 >;
 
+type RowAccent = { chipBg: string; chipText: string } | null;
+
 export function IngredientRow({
   ingredient,
   groupSuggestions,
   knownLists,
   recipes,
+  accent,
 }: {
   ingredient: Ingredient;
   groupSuggestions: string[];
   knownLists: string[];
   recipes: RecipeOption[];
+  accent?: RowAccent;
 }) {
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -361,16 +365,34 @@ export function IngredientRow({
     ingredient.retailer_codes.woolworths.length > 0 ||
     ingredient.retailer_codes.aldi.length > 0;
 
+  const expandedBgStyle =
+    expanded && accent
+      ? { backgroundColor: `${accent.chipBg}8f` }
+      : undefined;
+  const hoverTintClass = accent ? "" : " hover:bg-[var(--surface-muted)]";
+  const nameStyle = accent ? { color: `${accent.chipText}d9` } : undefined;
+
   return (
     <li
       className={
         "rounded-lg transition-colors " +
-        (expanded
-          ? "bg-[var(--surface-muted)]"
-          : "hover:bg-[var(--surface-muted)]")
+        (expanded && !accent ? "bg-[var(--surface-muted)]" : hoverTintClass)
       }
+      style={expandedBgStyle}
     >
-      <div className="flex items-center gap-2 px-2 py-1.5">
+      <div
+        className="flex items-center gap-2 px-2 py-1.5"
+        onMouseEnter={(e) => {
+          if (!expanded && accent) {
+            (e.currentTarget as HTMLDivElement).style.backgroundColor = `${accent.chipBg}77`;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (accent) {
+            (e.currentTarget as HTMLDivElement).style.backgroundColor = "";
+          }
+        }}
+      >
         <ListPicker
           lists={ingredient.lists}
           knownLists={knownLists}
@@ -385,7 +407,10 @@ export function IngredientRow({
           }
           aria-expanded={expanded}
         >
-          <div className="font-medium text-[var(--foreground)] truncate flex items-center gap-1">
+          <div
+            className="font-medium truncate flex items-center gap-1 text-sm"
+            style={nameStyle ?? { color: "var(--foreground)" }}
+          >
             <span className="truncate">{ingredient.name}</span>
             {ingredient.linked_recipe_id && (
               <ChefHat

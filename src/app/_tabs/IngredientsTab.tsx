@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
+import { paletteColor } from "@/lib/category-palette";
 import type { BootstrapData } from "@/lib/queries";
-import type { Ingredient, Recipe } from "@/lib/types";
+import type { CategoryMetaRow, Ingredient, Recipe } from "@/lib/types";
 import { AddIngredientForm } from "@/app/ingredients/AddIngredientForm";
 import { IngredientRow } from "@/app/ingredients/IngredientRow";
 
@@ -17,8 +18,9 @@ const UNGROUPED_LABEL = "Ungrouped";
 export function IngredientsTab({ data }: { data: BootstrapData }) {
   const ingredients = data.ingredients as Ingredient[];
   const recipes = data.recipes as RecipeOption[];
+  const categoryMeta = data.categoryMeta as CategoryMetaRow[];
 
-  const { groupKeys, byGroup, groupSuggestions, knownLists } = useMemo(() => {
+  const { groupKeys, byGroup, groupSuggestions, knownLists, metaByName } = useMemo(() => {
     const byGroup = new Map<string, Ingredient[]>();
     const listSet = new Set<string>();
     for (const ing of ingredients) {
@@ -28,11 +30,23 @@ export function IngredientsTab({ data }: { data: BootstrapData }) {
       byGroup.set(key, bucket);
       for (const l of ing.lists) listSet.add(l);
     }
+    for (const bucket of byGroup.values()) {
+      bucket.sort((a, b) => a.name.localeCompare(b.name));
+    }
 
-    const groupKeys = Array.from(byGroup.keys())
-      .filter((k) => k !== UNGROUPED_KEY)
-      .sort((a, b) => a.localeCompare(b));
-    if (byGroup.has(UNGROUPED_KEY)) groupKeys.push(UNGROUPED_KEY);
+    const metaByName = new Map<string, CategoryMetaRow>();
+    for (const m of categoryMeta) metaByName.set(m.name, m);
+
+    // Mirror shopping-list ordering: sort_order from category_meta first,
+    // ungrouped last.
+    const groupKeys = Array.from(byGroup.keys()).sort((a, b) => {
+      if (a === UNGROUPED_KEY) return 1;
+      if (b === UNGROUPED_KEY) return -1;
+      const sa = metaByName.get(a)?.sort_order ?? 1_000_000;
+      const sb = metaByName.get(b)?.sort_order ?? 1_000_000;
+      if (sa !== sb) return sa - sb;
+      return a.localeCompare(b);
+    });
 
     const groupSuggestions = Array.from(byGroup.keys())
       .filter((k) => k !== UNGROUPED_KEY)
@@ -41,8 +55,8 @@ export function IngredientsTab({ data }: { data: BootstrapData }) {
     const knownLists = Array.from(listSet).sort((a, b) => a.localeCompare(b));
     if (!listSet.has("Staples")) knownLists.unshift("Staples");
 
-    return { byGroup, groupKeys, groupSuggestions, knownLists };
-  }, [ingredients]);
+    return { byGroup, groupKeys, groupSuggestions, knownLists, metaByName };
+  }, [ingredients, categoryMeta]);
 
   return (
     <div className="space-y-6">
@@ -65,27 +79,65 @@ export function IngredientsTab({ data }: { data: BootstrapData }) {
           Nothing in the pantry yet. Add your first ingredient above.
         </p>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {groupKeys.map((key) => {
             const label = key === UNGROUPED_KEY ? UNGROUPED_LABEL : key;
             const items = byGroup.get(key) ?? [];
+            const color = paletteColor(metaByName.get(key)?.color ?? null);
+            const headerStyle = color
+              ? { backgroundColor: color.chipBg, color: color.chipText }
+              : undefined;
+            const ulStyle = color
+              ? { backgroundColor: `${color.chipBg}47`, borderColor: `${color.chipText}12` }
+              : undefined;
+            const divideBorder = color ? `${color.chipText}12` : undefined;
             return (
-              <section key={key} className="space-y-2">
-                <h3 className="font-serif text-lg text-[var(--accent)] px-1">
+              <section key={key} className="space-y-1">
+                <h3
+                  className={
+                    "inline-flex items-center font-serif text-sm uppercase tracking-wide px-2.5 py-0.5 rounded-full " +
+                    (color ? "" : "text-[var(--accent)]")
+                  }
+                  style={headerStyle}
+                >
                   {label}
-                  <span className="ml-2 text-sm font-sans text-[var(--muted)] font-normal">
+                  <span
+                    className="ml-2 text-xs font-sans normal-case font-normal opacity-70"
+                    style={color ? { color: color.chipText } : undefined}
+                  >
                     ({items.length})
                   </span>
                 </h3>
-                <ul className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm divide-y divide-[var(--border)]/70 p-1">
-                  {items.map((ing) => (
-                    <IngredientRow
+                <ul
+                  className={
+                    "rounded-xl p-1 border " +
+                    (color
+                      ? ""
+                      : "bg-[var(--surface-muted)]/60 border-transparent divide-y divide-[var(--border)]/60")
+                  }
+                  style={ulStyle}
+                >
+                  {items.map((ing, idx) => (
+                    <div
                       key={ing.id}
-                      ingredient={ing}
-                      groupSuggestions={groupSuggestions}
-                      knownLists={knownLists}
-                      recipes={recipes}
-                    />
+                      style={
+                        color && idx > 0
+                          ? { borderTop: `1px solid ${divideBorder}` }
+                          : undefined
+                      }
+                    >
+                      <IngredientRow
+                        ingredient={ing}
+                        groupSuggestions={groupSuggestions}
+                        knownLists={knownLists}
+                        recipes={recipes}
+                        accent={
+                          color
+                            ? { chipBg: color.chipBg, chipText: color.chipText }
+                            : null
+                        }
+                      />
+                    </div>
                   ))}
                 </ul>
               </section>

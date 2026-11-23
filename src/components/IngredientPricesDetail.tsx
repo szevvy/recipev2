@@ -79,15 +79,16 @@ export function IngredientPricesDetail({
     <div className="space-y-2">
       {sections.map(([retailer, variants]) => {
         const retailerWeight = weights?.[retailer] ?? null;
-        // For each variant, derive $/kg from retailer weight when the
-        // actor didn't publish one. Keeps the detail panel honest about
-        // what we're comparing across retailers.
+        // For each variant, normalise to $/kg via the retailer weight
+        // whenever the actor isn't already quoting in kg. Keeps the
+        // detail panel honest about what we're comparing across
+        // retailers (e.g. Woolies's "/ea" turns into "/kg").
         const derived = variants.map((p) => {
           if (
-            p.unit_price_cents == null &&
             p.price_cents != null &&
             retailerWeight != null &&
-            retailerWeight > 0
+            retailerWeight > 0 &&
+            p.unit_of_measure !== "kg"
           ) {
             return {
               ...p,

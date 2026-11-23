@@ -114,19 +114,20 @@ export function usePriceChipsFor(ingredientId: string | null): ChipGroup[] {
         const sale = p.on_sale ? " (sale)" : "";
         return `${title} — ${pack}${unit}${sale}`;
       });
-    // Derive $/kg from the user-set unit weight when the retailer didn't
-    // publish one. Actor data always wins — we only fill a gap. Keeps
-    // cross-retailer chips comparable (e.g. Coles $4.90/kg vs Woolies
-    // $0.86 each with a 175g weight → $4.91/kg).
+    // Normalise to $/kg using the user-set weight whenever the actor
+    // isn't already quoting in kg — Woolies sometimes returns
+    // "$0.86/ea" which is non-comparable with Coles's "$4.90/kg".
+    // Actor's kg price still wins when it's there; we only override
+    // when the uom is "ea" / "100g" / anything else.
     const retailerWeight = weights?.[retailer] ?? null;
     let bestUnitCents = bestVariant?.unit_price_cents ?? null;
     let bestUnitOfMeasure = bestVariant?.unit_of_measure ?? null;
     if (
       bestVariant &&
-      bestUnitCents == null &&
       bestVariant.price_cents != null &&
       retailerWeight != null &&
-      retailerWeight > 0
+      retailerWeight > 0 &&
+      bestUnitOfMeasure !== "kg"
     ) {
       bestUnitCents = Math.round(
         (bestVariant.price_cents * 1000) / retailerWeight,

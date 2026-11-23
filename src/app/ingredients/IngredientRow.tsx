@@ -297,13 +297,13 @@ export function IngredientRow({
               retailer="coles"
               label="Coles"
               ingredientId={ingredient.id}
-              initialWeightG={ingredient.retailer_weights.coles}
+              initialWeightG={ingredient.retailer_weights?.coles ?? null}
             />
             <RetailerWeightInput
               retailer="woolworths"
               label="Woolies"
               ingredientId={ingredient.id}
-              initialWeightG={ingredient.retailer_weights.woolworths}
+              initialWeightG={ingredient.retailer_weights?.woolworths ?? null}
             />
           </div>
           <div className="flex gap-2 justify-end items-center">

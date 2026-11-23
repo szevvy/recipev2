@@ -16,6 +16,7 @@ import type {
 } from "@/lib/types";
 import { setStapleStateAction } from "@/app/shopping/actions";
 import { StatePicker } from "@/app/shopping/StatePicker";
+import { IngredientPricesDetail } from "@/components/IngredientPricesDetail";
 import { PriceChips } from "@/components/PriceChips";
 import { QuantityPickerModal } from "./QuantityPickerModal";
 
@@ -199,10 +200,13 @@ function ListMemberRow({
 }) {
   const [state, setState] = useState<ShoppingItemState>(item.state);
   const [quantityModalOpen, setQuantityModalOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const invalidate = useInvalidateBootstrap();
   const qc = useQueryClient();
+  // Recipe-linked ingredients are made, not bought — no prices to show.
+  const canExpand = !item.linked_recipe_id;
 
   useEffect(() => {
     setState(item.state);
@@ -316,56 +320,75 @@ function ListMemberRow({
     : null;
 
   return (
-    <li className="flex items-center gap-2 px-2 py-1.5">
-      <div className="flex-1 min-w-0 flex items-center gap-2">
-        <span
-          className={
-            "text-sm truncate " + (state === "bought" ? "line-through" : "")
-          }
-          style={nameStyle}
-        >
-          {item.name}
-          {item.on_list_quantity && (
-            <span className="ml-1.5 text-[10px] italic text-[var(--muted)]">
-              {item.on_list_quantity} already on list
-            </span>
-          )}
-        </span>
-        {!item.linked_recipe_id && (
-          <PriceChips
-            ingredientId={item.ingredient_id}
-            size="sm"
-            variant="plan"
-          />
-        )}
-      </div>
-      {lastBought && (
-        <span
-          className="text-[10px] tabular-nums text-[var(--muted)] shrink-0"
-          style={ageStyle}
-          title={`Last bought ${new Date(item.last_purchased_at!).toLocaleDateString()}`}
-        >
-          {lastBought}
-        </span>
-      )}
-      {error && <span className="text-xs text-red-600">{error}</span>}
-      <StatePicker
-        state={state}
-        onChange={(next) => update(next)}
-        canMake={!!item.linked_recipe_id}
-        variant="list"
-        onNeedMore={() => setQuantityModalOpen(true)}
-      />
-      <QuantityPickerModal
-        open={quantityModalOpen}
-        itemName={item.name}
-        defaultQuantity={2}
-        onPick={(n) => {
-          setQuantityModalOpen(false);
-          update("to_buy", String(n));
+    <li>
+      <div
+        className={
+          "flex items-center gap-2 px-2 py-1.5 rounded-md " +
+          (canExpand ? "cursor-pointer" : "")
+        }
+        onClick={(e) => {
+          // Clicks inside the state picker / quantity modal / any button
+          // should not toggle expansion.
+          if ((e.target as HTMLElement).closest("button,input,textarea")) return;
+          if (canExpand) setExpanded((x) => !x);
         }}
-        onClose={() => setQuantityModalOpen(false)}
-      />
+        aria-expanded={canExpand ? expanded : undefined}
+      >
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          <span
+            className={
+              "text-sm truncate " + (state === "bought" ? "line-through" : "")
+            }
+            style={nameStyle}
+          >
+            {item.name}
+            {item.on_list_quantity && (
+              <span className="ml-1.5 text-[10px] italic text-[var(--muted)]">
+                {item.on_list_quantity} already on list
+              </span>
+            )}
+          </span>
+          {canExpand && (
+            <PriceChips
+              ingredientId={item.ingredient_id}
+              size="sm"
+              variant="plan"
+            />
+          )}
+        </div>
+        {lastBought && (
+          <span
+            className="text-[10px] tabular-nums text-[var(--muted)] shrink-0"
+            style={ageStyle}
+            title={`Last bought ${new Date(item.last_purchased_at!).toLocaleDateString()}`}
+          >
+            {lastBought}
+          </span>
+        )}
+        {error && <span className="text-xs text-red-600">{error}</span>}
+        <StatePicker
+          state={state}
+          onChange={(next) => update(next)}
+          canMake={!!item.linked_recipe_id}
+          variant="list"
+          onNeedMore={() => setQuantityModalOpen(true)}
+        />
+        <QuantityPickerModal
+          open={quantityModalOpen}
+          itemName={item.name}
+          defaultQuantity={2}
+          onPick={(n) => {
+            setQuantityModalOpen(false);
+            update("to_buy", String(n));
+          }}
+          onClose={() => setQuantityModalOpen(false)}
+        />
+      </div>
+      {canExpand && expanded && (
+        <div className="px-3 pb-2 pt-1">
+          <IngredientPricesDetail ingredientId={item.ingredient_id} />
+        </div>
+      )}
     </li>
   );
 }

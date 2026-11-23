@@ -163,6 +163,15 @@ export function IngredientPricesDetail({
                   <div className="flex items-baseline gap-2 shrink-0 tabular-nums">
                     {p.price_cents != null ? (
                       <>
+                        {/* Was-price (pack) first so it reads "was X · now Y". */}
+                        {priceDisplay !== "per_kg" &&
+                          p.on_sale &&
+                          p.regular_price_cents != null &&
+                          p.regular_price_cents > p.price_cents && (
+                            <span className="line-through text-[var(--muted)]/70 font-normal">
+                              ${(p.regular_price_cents / 100).toFixed(2)}
+                            </span>
+                          )}
                         {/* Pack price (with pack-size annotation when unit
                             price exists). Hidden in "per_kg" mode. */}
                         {priceDisplay !== "per_kg" && (
@@ -177,31 +186,7 @@ export function IngredientPricesDetail({
                               )}
                           </span>
                         )}
-                        {/* Was-price (pack) when on sale. Rendered in the
-                            pack column so it sits next to the pack price. */}
-                        {priceDisplay !== "per_kg" &&
-                          p.on_sale &&
-                          p.regular_price_cents != null &&
-                          p.regular_price_cents > p.price_cents && (
-                            <span className="line-through text-[var(--muted)]/70 font-normal">
-                              ${(p.regular_price_cents / 100).toFixed(2)}
-                            </span>
-                          )}
-                        {/* Unit price. Hidden in "pack" mode. */}
-                        {priceDisplay !== "pack" &&
-                          p.unit_price_cents != null &&
-                          p.unit_of_measure && (
-                            <span
-                              className={
-                                priceDisplay === "per_kg"
-                                  ? "font-medium"
-                                  : "text-[var(--muted)]"
-                              }
-                            >
-                              ${(p.unit_price_cents / 100).toFixed(2)}/{p.unit_of_measure}
-                            </span>
-                          )}
-                        {/* Was-price (per unit) when on sale. */}
+                        {/* Was-price (per unit) first so it reads "was X · now Y". */}
                         {priceDisplay !== "pack" &&
                           p.on_sale &&
                           p.regular_price_cents != null &&
@@ -216,6 +201,20 @@ export function IngredientPricesDetail({
                                 100
                               ).toFixed(2)}
                               /{p.unit_of_measure}
+                            </span>
+                          )}
+                        {/* Unit price. Hidden in "pack" mode. */}
+                        {priceDisplay !== "pack" &&
+                          p.unit_price_cents != null &&
+                          p.unit_of_measure && (
+                            <span
+                              className={
+                                priceDisplay === "per_kg"
+                                  ? "font-medium"
+                                  : "text-[var(--muted)]"
+                              }
+                            >
+                              ${(p.unit_price_cents / 100).toFixed(2)}/{p.unit_of_measure}
                             </span>
                           )}
                         {p.on_sale && (

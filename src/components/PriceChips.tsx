@@ -391,7 +391,7 @@ export function PriceChips({
             className={
               "inline-flex items-center gap-1 " +
               (g.cheapest
-                ? "text-[var(--accent)] font-semibold"
+                ? "text-[var(--sage)] font-semibold"
                 : "text-[var(--muted)]")
             }
             title={g.title}
@@ -412,12 +412,13 @@ export function PriceChips({
               <span className="line-through">OOS</span>
             ) : g.showPrice ? (
               <>
-                <span>{g.priceLabel}</span>
+                {/* "was X · now Y" reads more naturally than the reverse. */}
                 {g.regularLabel && (
                   <span className="line-through text-[var(--muted)]/70 font-normal">
                     {g.regularLabel}
                   </span>
                 )}
+                <span>{g.priceLabel}</span>
               </>
             ) : null}
             {soloVariantHint && !g.outOfStock && (

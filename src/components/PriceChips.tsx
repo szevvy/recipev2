@@ -296,8 +296,11 @@ function pickDisplay(groups: ChipGroup[], variant: ChipVariant): DisplayGroup[] 
   if (inStock.length === 0) return [];
   if (inStock.length === 1) {
     // Either a single retailer or multiple at the same price — the
-    // priceLabel offers no decision value, hide it.
-    return [{ ...inStock[0], showPrice: false }];
+    // priceLabel usually offers no decision value, hide it. Exception:
+    // keep the price visible when it's on sale so the user knows what
+    // the special is (useful when both retailers run the same sale).
+    const g = inStock[0];
+    return [{ ...g, showPrice: g.onSale }];
   }
   const cheapest = inStock.find((g) => g.cheapest) ?? inStock[0];
   return [{ ...cheapest, showPrice: true }];

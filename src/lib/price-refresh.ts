@@ -60,6 +60,23 @@ function toCents(n: number | null | undefined): number | null {
   return Math.round(n * 100);
 }
 
+// The actor's `onSale` flag fires on shelf promotions that aren't real
+// price cuts (e.g. 98c Pink Lady apples, regularPrice=null, promoText=null
+// — just a merchandising highlight). Only count it as "on sale" when
+// there's an actual regular→special delta OR a non-empty promoText.
+function isTrulyOnSale(row: {
+  price?: number | null;
+  regularPrice?: number | null;
+  promoText?: string | null;
+}): boolean {
+  const price = row.price;
+  const regular = row.regularPrice;
+  if (price != null && regular != null && regular > price) return true;
+  const promo = row.promoText?.trim();
+  if (promo) return true;
+  return false;
+}
+
 function normaliseRetailer(raw: string | null | undefined): Retailer | null {
   if (!raw) return null;
   // The actor returns the retailer with trailing qualifiers sometimes —
@@ -256,7 +273,7 @@ export async function refreshPrices(): Promise<RefreshResult> {
       stock_code: ref.stock_code,
       price_cents: isProduct ? toCents(match?.price ?? null) : null,
       regular_price_cents: isProduct ? toCents(match?.regularPrice ?? null) : null,
-      on_sale: !!(isProduct && match?.onSale),
+      on_sale: !!(isProduct && match && isTrulyOnSale(match)),
       in_stock: inStock,
       unit_price_cents: unitPriceCents,
       unit_of_measure: unitOfMeasure,

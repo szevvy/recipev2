@@ -16,6 +16,7 @@ import type {
 } from "@/lib/types";
 import { setStapleStateAction } from "@/app/shopping/actions";
 import { StatePicker } from "@/app/shopping/StatePicker";
+import { PriceChips } from "@/components/PriceChips";
 import { QuantityPickerModal } from "./QuantityPickerModal";
 
 export type ListMemberView = {
@@ -316,19 +317,24 @@ function ListMemberRow({
 
   return (
     <li className="flex items-center gap-2 px-2 py-1.5">
-      <span
-        className={
-          "flex-1 text-sm truncate " + (state === "bought" ? "line-through" : "")
-        }
-        style={nameStyle}
-      >
-        {item.name}
-        {item.on_list_quantity && (
-          <span className="ml-1.5 text-[10px] italic text-[var(--muted)]">
-            {item.on_list_quantity} already on list
-          </span>
+      <div className="flex-1 min-w-0">
+        <span
+          className={
+            "block text-sm truncate " + (state === "bought" ? "line-through" : "")
+          }
+          style={nameStyle}
+        >
+          {item.name}
+          {item.on_list_quantity && (
+            <span className="ml-1.5 text-[10px] italic text-[var(--muted)]">
+              {item.on_list_quantity} already on list
+            </span>
+          )}
+        </span>
+        {!item.linked_recipe_id && (
+          <PriceChips ingredientId={item.ingredient_id} size="sm" />
         )}
-      </span>
+      </div>
       {lastBought && (
         <span
           className="text-[10px] tabular-nums text-[var(--muted)] shrink-0"

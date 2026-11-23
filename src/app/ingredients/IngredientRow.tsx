@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { ChefHat, Pencil, Trash2, Check, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { Ingredient, Recipe } from "@/lib/types";
+import type { Ingredient, IngredientPrice, Recipe, Retailer } from "@/lib/types";
 import { ListPicker } from "@/components/ListPicker";
 import { LinkedRecipePicker } from "@/components/LinkedRecipePicker";
 import { GroupCombobox } from "@/components/GroupCombobox";
@@ -93,6 +93,17 @@ export function IngredientRow({
       woolworths: parseCodes(String(fd.get("retailer_woolworths") ?? "")),
       aldi: parseCodes(String(fd.get("retailer_aldi") ?? "")),
     };
+    function parseWeight(raw: string): number | null {
+      const trimmed = raw.trim();
+      if (!trimmed) return null;
+      const n = Number.parseInt(trimmed, 10);
+      return Number.isFinite(n) && n > 0 && n <= 100_000 ? n : null;
+    }
+    const nextRetailerWeights = {
+      coles: parseWeight(String(fd.get("weight_g_coles") ?? "")),
+      woolworths: parseWeight(String(fd.get("weight_g_woolworths") ?? "")),
+      aldi: parseWeight(String(fd.get("weight_g_aldi") ?? "")),
+    };
     const snapshot = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
     qc.setQueryData<BootstrapData>(BOOTSTRAP_KEY, (old) => {
       if (!old) return old;
@@ -106,6 +117,7 @@ export function IngredientRow({
                 lists: nextLists,
                 linked_recipe_id: nextLinkedRecipeId,
                 retailer_codes: nextRetailerCodes,
+                retailer_weights: nextRetailerWeights,
                 updated_at: new Date().toISOString(),
               }
             : i,
@@ -275,6 +287,25 @@ export function IngredientRow({
               />
             </label>
           </div>
+          <div className="space-y-1">
+            <p className="text-xs text-[var(--muted)]">
+              Unit weight — fill any two to auto-derive the third. Only weight
+              is saved; we use it to compute $/kg when the retailer only
+              lists an each price.
+            </p>
+            <RetailerWeightInput
+              retailer="coles"
+              label="Coles"
+              ingredientId={ingredient.id}
+              initialWeightG={ingredient.retailer_weights.coles}
+            />
+            <RetailerWeightInput
+              retailer="woolworths"
+              label="Woolies"
+              ingredientId={ingredient.id}
+              initialWeightG={ingredient.retailer_weights.woolworths}
+            />
+          </div>
           <div className="flex gap-2 justify-end items-center">
             {error && <p className="text-xs text-red-600 mr-auto">{error}</p>}
             <button
@@ -361,5 +392,123 @@ export function IngredientRow({
         </div>
       )}
     </li>
+  );
+}
+
+// Three linked inputs (weight / each / $per-kg) for one retailer. Any two
+// filled auto-derive the third on blur. Only weight is persisted — the
+// $ fields are convenience helpers pre-filled from the current cheapest
+// in-stock variant so the user can read off the retailer's site and let
+// the derivation compute the weight for them.
+function RetailerWeightInput({
+  retailer,
+  label,
+  ingredientId,
+  initialWeightG,
+}: {
+  retailer: Retailer;
+  label: string;
+  ingredientId: string;
+  initialWeightG: number | null;
+}) {
+  const qc = useQueryClient();
+  const bootstrap = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
+  const relevant = (bootstrap?.prices ?? []).filter(
+    (p: IngredientPrice) =>
+      p.ingredient_id === ingredientId && p.retailer === retailer && p.in_stock,
+  );
+  // Cheapest in-stock variant by unit price (fall back to pack) — same
+  // rule the chips use for picking the retailer's representative price.
+  const best = relevant
+    .slice()
+    .sort((a, b) => {
+      const au = a.unit_price_cents ?? a.price_cents ?? Number.MAX_SAFE_INTEGER;
+      const bu = b.unit_price_cents ?? b.price_cents ?? Number.MAX_SAFE_INTEGER;
+      return au - bu;
+    })[0];
+  const initialEach =
+    best?.price_cents != null ? (best.price_cents / 100).toFixed(2) : "";
+  const initialPerKg =
+    best?.unit_price_cents != null && best?.unit_of_measure === "kg"
+      ? (best.unit_price_cents / 100).toFixed(2)
+      : "";
+
+  const [weight, setWeight] = useState<string>(
+    initialWeightG != null ? String(initialWeightG) : "",
+  );
+  const [each, setEach] = useState<string>(initialEach);
+  const [perKg, setPerKg] = useState<string>(initialPerKg);
+
+  function recompute(changed: "weight" | "each" | "perKg") {
+    const w = Number.parseFloat(weight);
+    const e = Number.parseFloat(each);
+    const k = Number.parseFloat(perKg);
+    const hasW = Number.isFinite(w) && w > 0;
+    const hasE = Number.isFinite(e) && e > 0;
+    const hasK = Number.isFinite(k) && k > 0;
+
+    // Only derive the one that's still blank. Leaves user-entered values
+    // alone so a later price update doesn't silently overwrite the weight.
+    if (changed === "weight" && hasW) {
+      if (hasE && !hasK) setPerKg(((e / w) * 1000).toFixed(2));
+      else if (!hasE && hasK) setEach((k * (w / 1000)).toFixed(2));
+    } else if (changed === "each" && hasE) {
+      if (hasW && !hasK) setPerKg(((e / w) * 1000).toFixed(2));
+      else if (!hasW && hasK) setWeight(String(Math.round((e / k) * 1000)));
+    } else if (changed === "perKg" && hasK) {
+      if (hasW && !hasE) setEach((k * (w / 1000)).toFixed(2));
+      else if (!hasW && hasE) setWeight(String(Math.round((e / k) * 1000)));
+    }
+  }
+
+  const inputCls =
+    "w-16 rounded-md border border-[var(--border)] bg-white px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)] tabular-nums";
+
+  return (
+    <div className="flex items-center gap-2 text-xs text-[var(--muted)] flex-wrap">
+      <span className="w-20 shrink-0">{label}</span>
+      <label className="inline-flex items-center gap-1">
+        <input
+          type="number"
+          name={`weight_g_${retailer}`}
+          value={weight}
+          onChange={(e) => setWeight(e.target.value)}
+          onBlur={() => recompute("weight")}
+          min={1}
+          step={1}
+          placeholder="—"
+          className={inputCls}
+        />
+        <span>g</span>
+      </label>
+      <label className="inline-flex items-center gap-1">
+        <span>$</span>
+        <input
+          type="number"
+          value={each}
+          onChange={(e) => setEach(e.target.value)}
+          onBlur={() => recompute("each")}
+          min={0}
+          step={0.01}
+          placeholder="—"
+          className={inputCls}
+        />
+        <span>each</span>
+      </label>
+      <label className="inline-flex items-center gap-1">
+        <span>$</span>
+        <input
+          type="number"
+          value={perKg}
+          onChange={(e) => setPerKg(e.target.value)}
+          onBlur={() => recompute("perKg")}
+          min={0}
+          step={0.01}
+          placeholder="—"
+          className={inputCls}
+        />
+        <span>/kg</span>
+      </label>
+    </div>
   );
 }

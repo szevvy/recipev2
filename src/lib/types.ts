@@ -22,6 +22,15 @@ export type Ingredient = {
   // salmon skin-on + skin-off). Empty array when the user hasn't linked
   // that retailer yet.
   retailer_codes: { coles: string[]; woolworths: string[]; aldi: string[] };
+  // Per-retailer unit weight in grams. Used to derive $/kg when the
+  // retailer only publishes each-pricing. Null means no weight set for
+  // that retailer; actor data still wins when the actor publishes
+  // $/kg directly.
+  retailer_weights: {
+    coles: number | null;
+    woolworths: number | null;
+    aldi: number | null;
+  };
   staple_state: StapleState;
   created_at: string;
   updated_at: string;

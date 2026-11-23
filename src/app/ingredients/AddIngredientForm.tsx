@@ -65,6 +65,7 @@ export function AddIngredientForm({
       linked_recipe_id: linkedRecipeId,
       shelf_life_days: shelfLifeDays,
       retailer_codes: { coles: [], woolworths: [], aldi: [] },
+      retailer_weights: { coles: null, woolworths: null, aldi: null },
       staple_state: "not_checked",
       created_at: nowIso,
       updated_at: nowIso,

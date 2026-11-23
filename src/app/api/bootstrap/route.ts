@@ -31,6 +31,7 @@ export async function GET() {
     latestPurchasesResp,
     listMembershipsResp,
     retailerCodesResp,
+    retailerWeightsResp,
     pricesResp,
   ] = await Promise.all([
     supabase
@@ -65,6 +66,9 @@ export async function GET() {
     supabase
       .from("ingredient_retailer_codes")
       .select("ingredient_id, retailer, stock_code"),
+    supabase
+      .from("ingredient_retailer_weights")
+      .select("ingredient_id, retailer, unit_weight_g"),
     supabase.from("ingredient_prices").select("*"),
   ]);
 
@@ -77,6 +81,7 @@ export async function GET() {
     latestPurchasesResp.error ??
     listMembershipsResp.error ??
     retailerCodesResp.error ??
+    retailerWeightsResp.error ??
     pricesResp.error;
   if (firstErr) {
     return NextResponse.json({ ok: false, error: firstErr.message }, { status: 500 });
@@ -109,12 +114,27 @@ export async function GET() {
     codes.woolworths.sort();
     codes.aldi.sort();
   }
+  type RetailerWeights = {
+    coles: number | null;
+    woolworths: number | null;
+    aldi: number | null;
+  };
+  function emptyWeights(): RetailerWeights {
+    return { coles: null, woolworths: null, aldi: null };
+  }
+  const weightsByIngredientId = new Map<string, RetailerWeights>();
+  for (const row of retailerWeightsResp.data ?? []) {
+    const current = weightsByIngredientId.get(row.ingredient_id) ?? emptyWeights();
+    current[row.retailer as keyof RetailerWeights] = row.unit_weight_g;
+    weightsByIngredientId.set(row.ingredient_id, current);
+  }
   const ingredients = (ingredientsResp.data ?? []).map((i) => ({
     ...i,
     lists: (listsByIngredientId.get(i.id) ?? []).slice().sort((a, b) =>
       a.localeCompare(b),
     ),
     retailer_codes: codesByIngredientId.get(i.id) ?? emptyCodes(),
+    retailer_weights: weightsByIngredientId.get(i.id) ?? emptyWeights(),
   }));
 
   return NextResponse.json({

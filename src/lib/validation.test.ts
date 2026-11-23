@@ -34,6 +34,7 @@ describe("parseIngredientForm", () => {
       linked_recipe_id: null,
       shelf_life_days: null,
       retailer_codes: { coles: [], woolworths: [], aldi: [] },
+      retailer_weights: { coles: null, woolworths: null, aldi: null },
     });
   });
 

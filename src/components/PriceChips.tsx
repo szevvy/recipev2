@@ -45,6 +45,12 @@ export function usePriceChipsFor(ingredientId: string | null): ChipGroup[] {
     (p) => p.ingredient_id === ingredientId,
   );
   if (prices.length === 0) return [];
+  // Per-retailer weight (grams) set on the ingredient — lets us derive
+  // $/kg when the retailer only publishes an each price.
+  const ingredient = (bootstrap?.ingredients ?? []).find(
+    (i) => i.id === ingredientId,
+  );
+  const weights = ingredient?.retailer_weights ?? null;
 
   // Group by retailer and collapse variants: one chip per retailer. We
   // prefer unit price ($/kg etc.) for cheapest decisions so a smaller
@@ -108,10 +114,29 @@ export function usePriceChipsFor(ingredientId: string | null): ChipGroup[] {
         const sale = p.on_sale ? " (sale)" : "";
         return `${title} — ${pack}${unit}${sale}`;
       });
+    // Derive $/kg from the user-set unit weight when the retailer didn't
+    // publish one. Actor data always wins — we only fill a gap. Keeps
+    // cross-retailer chips comparable (e.g. Coles $4.90/kg vs Woolies
+    // $0.86 each with a 175g weight → $4.91/kg).
+    const retailerWeight = weights?.[retailer] ?? null;
+    let bestUnitCents = bestVariant?.unit_price_cents ?? null;
+    let bestUnitOfMeasure = bestVariant?.unit_of_measure ?? null;
+    if (
+      bestVariant &&
+      bestUnitCents == null &&
+      bestVariant.price_cents != null &&
+      retailerWeight != null &&
+      retailerWeight > 0
+    ) {
+      bestUnitCents = Math.round(
+        (bestVariant.price_cents * 1000) / retailerWeight,
+      );
+      bestUnitOfMeasure = "kg";
+    }
     pricings.push({
       retailer,
-      bestUnitCents: bestVariant?.unit_price_cents ?? null,
-      bestUnitOfMeasure: bestVariant?.unit_of_measure ?? null,
+      bestUnitCents,
+      bestUnitOfMeasure,
       bestPackCents: bestVariant?.price_cents ?? null,
       bestVariantTitle: bestVariant?.product_title ?? null,
       variantCount: bucket.length,

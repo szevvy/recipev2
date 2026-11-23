@@ -57,7 +57,30 @@ export const IngredientInputSchema = z.object({
       woolworths: splitCodes(v?.woolworths ?? null),
       aldi: splitCodes(v?.aldi ?? null),
     })),
+  // Per-retailer unit weight in grams. Blank → null (delete any
+  // existing row for that retailer). Non-positive values are rejected.
+  retailer_weights: z
+    .object({
+      coles: z.string().optional().nullable(),
+      woolworths: z.string().optional().nullable(),
+      aldi: z.string().optional().nullable(),
+    })
+    .optional()
+    .transform((v) => ({
+      coles: parseWeightG(v?.coles ?? null),
+      woolworths: parseWeightG(v?.woolworths ?? null),
+      aldi: parseWeightG(v?.aldi ?? null),
+    })),
 });
+
+function parseWeightG(raw: string | null | undefined): number | null {
+  if (raw == null) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const n = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(n) || n <= 0 || n > 100_000) return null;
+  return n;
+}
 
 function splitCodes(raw: string | null | undefined): string[] {
   if (!raw) return [];
@@ -101,6 +124,11 @@ export function parseIngredientForm(fd: FormData): IngredientInput {
       coles: String(fd.get("retailer_coles") ?? ""),
       woolworths: String(fd.get("retailer_woolworths") ?? ""),
       aldi: String(fd.get("retailer_aldi") ?? ""),
+    },
+    retailer_weights: {
+      coles: String(fd.get("weight_g_coles") ?? ""),
+      woolworths: String(fd.get("weight_g_woolworths") ?? ""),
+      aldi: String(fd.get("weight_g_aldi") ?? ""),
     },
   };
   return IngredientInputSchema.parse(raw);

@@ -63,6 +63,23 @@ export async function createIngredientAction(fd: FormData): Promise<ActionResult
         .insert(retailerRows);
       if (codesErr) return { ok: false, error: codesErr.message };
     }
+    const weightRows: Array<{
+      ingredient_id: string;
+      retailer: "coles" | "woolworths" | "aldi";
+      unit_weight_g: number;
+    }> = [];
+    for (const retailer of ["coles", "woolworths", "aldi"] as const) {
+      const w = input.retailer_weights[retailer];
+      if (w != null) {
+        weightRows.push({ ingredient_id: inserted.id, retailer, unit_weight_g: w });
+      }
+    }
+    if (weightRows.length > 0) {
+      const { error: wErr } = await supabase
+        .from("ingredient_retailer_weights")
+        .insert(weightRows);
+      if (wErr) return { ok: false, error: wErr.message };
+    }
     return { ok: true };
   } catch (err) {
     return { ok: false, error: toError(err) };
@@ -153,6 +170,32 @@ export async function updateIngredientAction(id: string, fd: FormData): Promise<
           .eq("retailer", retailer)
           .in("stock_code", toRemove);
         if (delPriceErr) return { ok: false, error: delPriceErr.message };
+      }
+    }
+
+    // Reconcile retailer weights. Blank → delete the row; non-null → upsert.
+    for (const retailer of ["coles", "woolworths", "aldi"] as const) {
+      const weight = input.retailer_weights[retailer];
+      if (weight == null) {
+        const { error: delErr } = await supabase
+          .from("ingredient_retailer_weights")
+          .delete()
+          .eq("ingredient_id", id)
+          .eq("retailer", retailer);
+        if (delErr) return { ok: false, error: delErr.message };
+      } else {
+        const { error: upErr } = await supabase
+          .from("ingredient_retailer_weights")
+          .upsert(
+            {
+              ingredient_id: id,
+              retailer,
+              unit_weight_g: weight,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "ingredient_id,retailer" },
+          );
+        if (upErr) return { ok: false, error: upErr.message };
       }
     }
     return { ok: true };

@@ -89,6 +89,25 @@ export type Database = {
         };
         Relationships: [];
       };
+      ingredient_retailer_weights: {
+        Row: {
+          ingredient_id: string;
+          retailer: Retailer;
+          unit_weight_g: number;
+          updated_at: string;
+        };
+        Insert: {
+          ingredient_id: string;
+          retailer: Retailer;
+          unit_weight_g: number;
+          updated_at?: string;
+        };
+        Update: {
+          unit_weight_g?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       ingredient_prices: {
         Row: IngredientPrice;
         Insert: {

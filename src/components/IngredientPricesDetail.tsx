@@ -60,6 +60,10 @@ export function IngredientPricesDetail({
       </p>
     );
   }
+  const ingredient = (bootstrap?.ingredients ?? []).find(
+    (i) => i.id === ingredientId,
+  );
+  const weights = ingredient?.retailer_weights ?? null;
 
   const byRetailer = new Map<Retailer, IngredientPrice[]>();
   for (const p of prices) {
@@ -74,7 +78,28 @@ export function IngredientPricesDetail({
   return (
     <div className="space-y-2">
       {sections.map(([retailer, variants]) => {
-        const sorted = variants.slice().sort((a, b) => {
+        const retailerWeight = weights?.[retailer] ?? null;
+        // For each variant, derive $/kg from retailer weight when the
+        // actor didn't publish one. Keeps the detail panel honest about
+        // what we're comparing across retailers.
+        const derived = variants.map((p) => {
+          if (
+            p.unit_price_cents == null &&
+            p.price_cents != null &&
+            retailerWeight != null &&
+            retailerWeight > 0
+          ) {
+            return {
+              ...p,
+              unit_price_cents: Math.round(
+                (p.price_cents * 1000) / retailerWeight,
+              ),
+              unit_of_measure: "kg",
+            };
+          }
+          return p;
+        });
+        const sorted = derived.slice().sort((a, b) => {
           const au = a.unit_price_cents ?? a.price_cents ?? Number.MAX_SAFE_INTEGER;
           const bu = b.unit_price_cents ?? b.price_cents ?? Number.MAX_SAFE_INTEGER;
           return au - bu;

@@ -268,22 +268,65 @@ export function usePriceChipsFor(ingredientId: string | null): ChipGroup[] {
   });
 }
 
+// Per-surface rendering rules — see each variant case for the logic:
+//  - "ingredients": full list of every retailer-group, OOS included.
+//    Admin-ish; the user wants to see everything here.
+//  - "shopping"  : one chip. If multiple retailers are available at the
+//    same price, show their icons without a number (price doesn't drive
+//    a decision). If one retailer is cheaper, show only its icon + price.
+//    If only one retailer is available (no code / OOS / solo stock),
+//    show just that icon with no price.
+//  - "plan"      : only on-sale items (the planner cares about
+//    opportunistic buys, not routine prices).
+type ChipVariant = "ingredients" | "shopping" | "plan";
+
+type DisplayGroup = ChipGroup & { showPrice: boolean };
+
+function pickDisplay(groups: ChipGroup[], variant: ChipVariant): DisplayGroup[] {
+  if (variant === "ingredients") {
+    return groups.map((g) => ({ ...g, showPrice: true }));
+  }
+  const inStock = groups.filter((g) => !g.outOfStock);
+  if (variant === "plan") {
+    return inStock
+      .filter((g) => g.onSale)
+      .map((g) => ({ ...g, showPrice: true }));
+  }
+  // shopping
+  if (inStock.length === 0) return [];
+  if (inStock.length === 1) {
+    // Either a single retailer or multiple at the same price — the
+    // priceLabel offers no decision value, hide it.
+    return [{ ...inStock[0], showPrice: false }];
+  }
+  const cheapest = inStock.find((g) => g.cheapest) ?? inStock[0];
+  return [{ ...cheapest, showPrice: true }];
+}
+
 export function PriceChips({
   ingredientId,
   size = "md",
+  variant = "ingredients",
 }: {
   ingredientId: string | null;
   size?: "sm" | "md";
+  variant?: ChipVariant;
 }) {
   const groups = usePriceChipsFor(ingredientId);
-  if (groups.length === 0) return null;
+  const display = pickDisplay(groups, variant);
+  if (display.length === 0) return null;
   const textCls = size === "sm" ? "text-[10px]" : "text-xs";
   const iconPx = size === "sm" ? 10 : 12;
+  // Variant hints add noise on the compact inline surfaces — keep them
+  // for the admin-y Ingredients list only.
+  const showVariantHint = variant === "ingredients";
   return (
-    <div className={`flex items-center gap-2 ${textCls}`}>
-      {groups.map((g) => {
+    <div className={`inline-flex items-center gap-2 ${textCls}`}>
+      {display.map((g) => {
         const soloVariantHint =
-          g.retailers.length === 1 ? g.retailers[0].variantHint : null;
+          showVariantHint && g.retailers.length === 1
+            ? g.retailers[0].variantHint
+            : null;
         return (
           <span
             key={g.key}
@@ -309,9 +352,9 @@ export function PriceChips({
             </span>
             {g.outOfStock ? (
               <span className="line-through">OOS</span>
-            ) : (
+            ) : g.showPrice ? (
               <span>{g.priceLabel}</span>
-            )}
+            ) : null}
             {soloVariantHint && !g.outOfStock && (
               <span className="italic text-[var(--muted)] truncate max-w-[12ch]">
                 · {soloVariantHint}

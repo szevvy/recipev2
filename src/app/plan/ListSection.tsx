@@ -317,10 +317,10 @@ function ListMemberRow({
 
   return (
     <li className="flex items-center gap-2 px-2 py-1.5">
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 flex items-center gap-2">
         <span
           className={
-            "block text-sm truncate " + (state === "bought" ? "line-through" : "")
+            "text-sm truncate " + (state === "bought" ? "line-through" : "")
           }
           style={nameStyle}
         >
@@ -332,7 +332,11 @@ function ListMemberRow({
           )}
         </span>
         {!item.linked_recipe_id && (
-          <PriceChips ingredientId={item.ingredient_id} size="sm" />
+          <PriceChips
+            ingredientId={item.ingredient_id}
+            size="sm"
+            variant="plan"
+          />
         )}
       </div>
       {lastBought && (

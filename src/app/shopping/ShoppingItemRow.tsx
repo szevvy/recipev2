@@ -25,7 +25,7 @@ import {
   setItemStateAction,
 } from "./actions";
 import { StatePicker } from "./StatePicker";
-import { usePriceChipsFor } from "@/components/PriceChips";
+import { PriceChips } from "@/components/PriceChips";
 import { IngredientPricesDetail } from "@/components/IngredientPricesDetail";
 
 export type RowAccent = { chipBg: string; chipText: string } | null;
@@ -120,7 +120,6 @@ export function ShoppingItemRow({
   const dimmed = isBought || isLater;
   const notes = item.notes?.trim() ?? "";
   const buyHint = computeBuyHint(item);
-  const priceChips = usePriceChipsFor(item.ingredients?.id ?? null);
 
   const expandedRingStyle = expanded && accent
     ? { backgroundColor: `${accent.chipBg}8f`, boxShadow: `inset 0 0 0 1px ${accent.chipText}26` }
@@ -164,55 +163,25 @@ export function ShoppingItemRow({
           onClick={() => update(isBought ? "to_buy" : "bought")}
         />
         <div className="flex-1 min-w-0">
-          <span
-            className={"text-sm " + (isBought ? "line-through" : "")}
-            style={nameStyle ?? { color: "var(--foreground)" }}
-          >
-            {item.quantity ? <span className="font-medium">{item.quantity} </span> : null}
-            {item.ingredients?.name ?? item.name ?? "(unknown)"}
-          </span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className={"text-sm truncate " + (isBought ? "line-through" : "")}
+              style={nameStyle ?? { color: "var(--foreground)" }}
+            >
+              {item.quantity ? <span className="font-medium">{item.quantity} </span> : null}
+              {item.ingredients?.name ?? item.name ?? "(unknown)"}
+            </span>
+            {item.ingredients?.id && (
+              <PriceChips
+                ingredientId={item.ingredients.id}
+                size="sm"
+                variant="shopping"
+              />
+            )}
+          </div>
           {buyHint && (
             <div className="text-xs italic text-amber-700 mt-0.5 truncate flex items-center gap-1">
               <CalendarClock size={10} /> {buyHint}
-            </div>
-          )}
-          {priceChips.length > 0 && (
-            <div className="mt-0.5 flex items-center gap-2 text-[10px]">
-              {priceChips.map((g) => (
-                <span
-                  key={g.key}
-                  className={
-                    "inline-flex items-center gap-1 " +
-                    (g.cheapest
-                      ? "text-[var(--accent)] font-semibold"
-                      : "text-[var(--muted)]")
-                  }
-                  title={g.title}
-                >
-                  <span className="inline-flex items-center gap-0.5">
-                    {g.retailers.map((r) => (
-                      <img
-                        key={r.retailer}
-                        src={r.icon}
-                        alt={r.retailer}
-                        width={12}
-                        height={12}
-                        className="rounded-sm shrink-0"
-                      />
-                    ))}
-                  </span>
-                  {g.outOfStock ? (
-                    <span className="line-through">OOS</span>
-                  ) : (
-                    <span>{g.priceLabel}</span>
-                  )}
-                  {g.onSale && !g.outOfStock && (
-                    <span className="text-[9px] uppercase tracking-wide text-[var(--sage)]">
-                      sale
-                    </span>
-                  )}
-                </span>
-              ))}
             </div>
           )}
           {notes && !expanded && (

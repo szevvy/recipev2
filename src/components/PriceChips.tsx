@@ -358,7 +358,26 @@ function pickDisplay(groups: ChipGroup[], variant: ChipVariant): DisplayGroup[] 
     return [{ ...g, showPrice: g.onSale }];
   }
   const cheapest = inStock.find((g) => g.cheapest) ?? inStock[0];
-  return [{ ...cheapest, showPrice: true }];
+  const otherGroups = inStock.filter((g) => g !== cheapest);
+  const display: DisplayGroup[] = [{ ...cheapest, showPrice: true }];
+  if (otherGroups.length > 0) {
+    // Icon-only "also available at" chip so the user still sees
+    // which retailers stock the item (handy if they're already at
+    // one of the more expensive stores and want to save a trip).
+    const otherRetailers = otherGroups.flatMap((g) => g.retailers);
+    display.push({
+      key: `others:${otherRetailers.map((r) => r.retailer).join(",")}`,
+      retailers: otherRetailers,
+      priceLabel: "",
+      regularLabel: null,
+      cheapest: false,
+      outOfStock: false,
+      onSale: false,
+      title: otherGroups.map((g) => g.title).join("\n\n"),
+      showPrice: false,
+    });
+  }
+  return display;
 }
 
 export function PriceChips({

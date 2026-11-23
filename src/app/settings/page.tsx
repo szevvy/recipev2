@@ -4,7 +4,6 @@ import { supabaseAdmin } from "@/lib/supabase";
 import type { CategoryMetaRow, Ingredient } from "@/lib/types";
 import { CategoryManager, type CategoryRow } from "./CategoryManager";
 import { PostcodeInput } from "./PostcodeInput";
-import { RebuildPantryButton } from "./RebuildPantryButton";
 import { RefreshPricesButton } from "./RefreshPricesButton";
 import { WeekStartPicker } from "./WeekStartPicker";
 
@@ -99,20 +98,6 @@ export default async function SettingsPage() {
             </p>
           </div>
           <RefreshPricesButton initialLastRefreshedAt={lastRefreshedAt} />
-        </section>
-
-        <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-3">
-          <div>
-            <h2 className="font-serif text-xl text-[var(--foreground)]">Pantry</h2>
-            <p className="text-xs text-[var(--muted)] mt-0.5">
-              If you&apos;ve previously hit Finish shopping (before the pantry
-              change), your bought items were deleted. Run this to backfill
-              them from the meals you&apos;ve already shopped for — they&apos;ll
-              appear in Already have on the shopping list and as &ldquo;have&rdquo;
-              on each meal in the plan.
-            </p>
-          </div>
-          <RebuildPantryButton />
         </section>
 
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-3">

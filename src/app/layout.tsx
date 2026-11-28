@@ -17,6 +17,9 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: "Recipe Planner",
   description: "Household meal planner and shopping list",
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

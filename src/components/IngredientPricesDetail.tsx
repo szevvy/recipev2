@@ -17,6 +17,15 @@ const RETAILER_LABEL: Record<Retailer, string> = {
   aldi: "ALDI",
 };
 
+// Actor sometimes concatenates promo clauses with "; " — e.g.
+// "Pick any 2 for $12; Any 2 $12". The first clause tends to be the
+// verbose, human-written one; the trailing bit is often a terser repeat.
+function firstPromoClause(raw: string | null): string | null {
+  if (!raw) return null;
+  const first = raw.split(";")[0]?.trim();
+  return first || null;
+}
+
 // Derive pack size from pack + unit price (e.g. $7.40 pack @ $37/kg → 200g).
 // Normalises every weight/volume uom into grams/ml internally, then picks
 // a human unit on the way out (sub-1000g → g, otherwise kg; same for ml/L).
@@ -154,6 +163,11 @@ export function IngredientPricesDetail({
                     <div className="text-[var(--foreground)] truncate">
                       {p.product_title ?? `#${p.stock_code}`}
                     </div>
+                    {firstPromoClause(p.promo_text) && (
+                      <div className="text-[10px] italic text-[var(--sage)] truncate">
+                        {firstPromoClause(p.promo_text)}
+                      </div>
+                    )}
                     {(!p.in_stock || p.price_cents == null) && (
                       <div className="text-[10px] uppercase tracking-wide text-amber-700">
                         out of stock

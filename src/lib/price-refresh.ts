@@ -371,7 +371,15 @@ async function refreshAutoFetchedWeights(
     .from("ingredients")
     .select("id")
     .eq("auto_fetch_weight", true);
-  if (error || !optedIn || optedIn.length === 0) return;
+  if (error) {
+    console.warn(`[ww weights] opted-in query failed: ${error.message}`);
+    return;
+  }
+  if (!optedIn || optedIn.length === 0) {
+    console.log("[ww weights] no ingredients opted in; skipping");
+    return;
+  }
+  console.log(`[ww weights] ${optedIn.length} ingredients opted in`);
 
   const ingredientIds = optedIn.map((r) => r.id);
   const { data: codes } = await supabase
@@ -380,7 +388,10 @@ async function refreshAutoFetchedWeights(
     .eq("retailer", "woolworths")
     .in("ingredient_id", ingredientIds);
   const rows = codes ?? [];
-  if (rows.length === 0) return;
+  if (rows.length === 0) {
+    console.log("[ww weights] opted-in but no Woolies codes; skipping");
+    return;
+  }
 
   // Map stock_code -> ingredient_id. Multiple SKUs under the same
   // ingredient can resolve to the same weight (they're the same thing
@@ -390,7 +401,10 @@ async function refreshAutoFetchedWeights(
   for (const row of rows) codeToIngredient.set(row.stock_code, row.ingredient_id);
 
   const fetched = await fetchWoolworthsWeights(rows.map((r) => r.stock_code));
-  if (fetched.length === 0) return;
+  if (fetched.length === 0) {
+    console.log("[ww weights] fetcher returned nothing");
+    return;
+  }
 
   const byIngredient = new Map<string, number>();
   for (const { stockCode, unitWeightG } of fetched) {
@@ -413,5 +427,7 @@ async function refreshAutoFetchedWeights(
     .upsert(upserts, { onConflict: "ingredient_id,retailer" });
   if (upErr) {
     console.warn(`[ww weights] upsert failed: ${upErr.message}`);
+  } else {
+    console.log(`[ww weights] upserted ${upserts.length} weight(s)`);
   }
 }

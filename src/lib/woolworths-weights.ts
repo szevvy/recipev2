@@ -26,27 +26,63 @@ export type FetchedWeight = {
 };
 
 async function primeSession(): Promise<string | null> {
-  try {
-    const res = await fetch("https://www.woolworths.com.au/", {
-      method: "GET",
-      headers: {
-        "User-Agent": UA,
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-    });
-    if (!res.ok) return null;
-    // Collect every Set-Cookie; keep only the name=value portion so we
-    // can echo them back in a single Cookie header.
-    const raw = res.headers.getSetCookie?.() ?? [];
-    if (raw.length === 0) return null;
-    const pairs = raw
-      .map((c) => c.split(";")[0]?.trim())
-      .filter((v): v is string => !!v);
-    return pairs.join("; ");
-  } catch {
+  // Follow redirects manually so we can collect Set-Cookie from every
+  // hop — Node's auto-follow only exposes headers of the final response,
+  // but anti-bot cookies often land on the first 3xx.
+  const jar = new Map<string, string>(); // name -> value
+  let url = "https://www.woolworths.com.au/";
+  for (let i = 0; i < 6; i++) {
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "GET",
+        redirect: "manual",
+        headers: {
+          "User-Agent": UA,
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          ...(jar.size > 0
+            ? {
+                Cookie: Array.from(jar.entries())
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join("; "),
+              }
+            : {}),
+        },
+      });
+    } catch (e) {
+      console.warn(
+        `[ww weights] primeSession fetch failed: ${e instanceof Error ? e.message : "?"}`,
+      );
+      return null;
+    }
+    // Collect cookies from this hop into the jar.
+    const setCookies = res.headers.getSetCookie?.() ?? [];
+    for (const c of setCookies) {
+      const first = c.split(";")[0];
+      const eq = first?.indexOf("=") ?? -1;
+      if (!first || eq <= 0) continue;
+      jar.set(first.slice(0, eq).trim(), first.slice(eq + 1).trim());
+    }
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get("location");
+      if (!loc) break;
+      url = new URL(loc, url).toString();
+      continue;
+    }
+    if (!res.ok) {
+      console.warn(`[ww weights] primeSession got ${res.status} at ${url}`);
+      return null;
+    }
+    break;
+  }
+  if (jar.size === 0) {
+    console.warn("[ww weights] primeSession: no cookies captured");
     return null;
   }
+  return Array.from(jar.entries())
+    .map(([k, v]) => `${k}=${v}`)
+    .join("; ");
 }
 
 type ProductPayload = {
@@ -66,6 +102,9 @@ export async function fetchWoolworthsWeights(
     console.warn("[ww weights] failed to prime session, skipping");
     return [];
   }
+  console.log(
+    `[ww weights] primed session (${cookie.split(";").length} cookies); fetching ${unique.length} codes`,
+  );
 
   const results: FetchedWeight[] = [];
   for (const code of unique) {
@@ -82,11 +121,16 @@ export async function fetchWoolworthsWeights(
           },
         },
       );
-      if (!res.ok) continue;
+      if (!res.ok) {
+        console.warn(`[ww weights] ${code}: ${res.status}`);
+        continue;
+      }
       const json = (await res.json()) as ProductPayload;
       const grams = json.Product?.UnitWeightInGrams;
       if (grams && grams > 0) {
         results.push({ stockCode: code, unitWeightG: Math.round(grams) });
+      } else {
+        console.log(`[ww weights] ${code}: no UnitWeightInGrams`);
       }
     } catch (e) {
       console.warn(
@@ -97,5 +141,8 @@ export async function fetchWoolworthsWeights(
     // webhook's 60s cap.
     await new Promise((r) => setTimeout(r, 200));
   }
+  console.log(
+    `[ww weights] fetched ${results.length}/${unique.length} weights`,
+  );
   return results;
 }

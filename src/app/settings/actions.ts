@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { updatePostcode, updateWeekStart } from "@/lib/settings";
 import type { WeekStart } from "@/lib/types";
@@ -36,26 +37,26 @@ export async function setPostcodeAction(raw: string): Promise<ActionResult> {
 }
 
 export type RefreshPricesResult =
-  | {
-      ok: true;
-      totals: {
-        requested: number;
-        products: number;
-        notes: number;
-        updated: number;
-        outOfStock: number;
-      };
-      durationMs: number;
-      warnings?: string[];
-    }
+  | { ok: true; runId: string; requested: number }
   | { ok: false; error: string };
 
+// Fires the Apify run and returns immediately. The dataset comes back
+// asynchronously via /api/apify/webhook, which writes to
+// ingredient_prices. UI should poll bootstrap to see when the row-
+// level fetched_at updates.
 export async function refreshPricesAction(): Promise<RefreshPricesResult> {
-  const { refreshPrices } = await import("@/lib/price-refresh");
-  const result = await refreshPrices();
-  if (result.ok) {
-    revalidatePath("/shopping");
-    revalidatePath("/settings");
+  const secret = process.env.APIFY_WEBHOOK_SECRET;
+  if (!secret) {
+    return { ok: false, error: "APIFY_WEBHOOK_SECRET env var not set" };
   }
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  if (!host) {
+    return { ok: false, error: "Cannot determine host for webhook URL" };
+  }
+  const webhookUrl = `${proto}://${host}/api/apify/webhook?token=${encodeURIComponent(secret)}`;
+  const { kickoffPriceRefresh } = await import("@/lib/price-refresh");
+  const result = await kickoffPriceRefresh(webhookUrl);
   return result;
 }

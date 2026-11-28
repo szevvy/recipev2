@@ -19,8 +19,9 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Protect everything except /login, cron endpoints (which auth with
-    // CRON_SECRET bearer in-route), Next internals, and static assets.
-    "/((?!login|api/cron|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)).*)",
+    // Protect everything except /login, cron + apify callback endpoints
+    // (which auth with their own bearer / token secrets in-route),
+    // Next internals, and static assets.
+    "/((?!login|api/cron|api/apify|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)).*)",
   ],
 };

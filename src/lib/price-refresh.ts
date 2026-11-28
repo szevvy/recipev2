@@ -4,9 +4,11 @@ import { getSettings } from "./settings";
 import type { Retailer } from "./types";
 
 // vant47/australian-supermarket-prices-scraper actor on Apify.
-// Sync endpoint blocks until the run finishes and returns the dataset
-// rows directly. Fine for tens of items; if we ever get to hundreds
-// we'd switch to async + a webhook.
+// We used to hit run-sync-get-dataset-items (one HTTP call that starts
+// the actor + blocks for the result), but that was bumping into Vercel
+// Hobby's 60s function limit. Now we POST to /runs (async) with a
+// webhook pointing at /api/apify/webhook, return immediately, and the
+// webhook handler does the DB work when the dataset is ready.
 const APIFY_ACTOR = "vant47~australian-supermarket-prices-scraper";
 
 export type RefreshTotals = {
@@ -22,15 +24,12 @@ export type RefreshTotals = {
   outOfStock: number;
 };
 
-export type RefreshResult =
-  | {
-      ok: true;
-      totals: RefreshTotals;
-      durationMs: number;
-      // Non-empty when one retailer's call failed but at least one other
-      // succeeded — the Settings button + logs can surface these.
-      warnings?: string[];
-    }
+export type KickoffResult =
+  | { ok: true; runId: string; requested: number }
+  | { ok: false; error: string };
+
+export type ProcessResult =
+  | { ok: true; totals: RefreshTotals; durationMs: number }
   | { ok: false; error: string };
 
 type DatasetRow = {
@@ -107,60 +106,59 @@ function productIdFromUrl(url: string | null | undefined): string | null {
   return null;
 }
 
-export async function refreshPrices(): Promise<RefreshResult> {
-  const started = Date.now();
+type CodeRef = {
+  ingredient_id: string;
+  retailer: Retailer;
+  stock_code: string;
+};
+
+async function loadCodes(): Promise<
+  | { ok: true; codes: CodeRef[] }
+  | { ok: false; error: string }
+> {
+  const supabase = supabaseAdmin();
+  const { data, error } = await supabase
+    .from("ingredient_retailer_codes")
+    .select("ingredient_id, retailer, stock_code");
+  if (error) return { ok: false, error: error.message };
+  return {
+    ok: true,
+    codes: (data ?? []).map((row) => ({
+      ingredient_id: row.ingredient_id,
+      retailer: row.retailer as Retailer,
+      stock_code: row.stock_code,
+    })),
+  };
+}
+
+// Start an Apify run and register a webhook back to our own
+// /api/apify/webhook endpoint for when it finishes. Returns the run ID
+// immediately (no waiting), so this function stays well under any
+// Vercel timeout.
+export async function kickoffPriceRefresh(
+  webhookUrl: string,
+): Promise<KickoffResult> {
   const token = process.env.APIFY_TOKEN;
-  if (!token) {
-    return { ok: false, error: "APIFY_TOKEN env var not set" };
-  }
+  if (!token) return { ok: false, error: "APIFY_TOKEN env var not set" };
 
   const settings = await getSettings();
   const postcode = settings.postcode;
-  if (!postcode) {
-    return { ok: false, error: "Set a postcode in Settings first" };
+  if (!postcode) return { ok: false, error: "Set a postcode in Settings first" };
+
+  const codesResult = await loadCodes();
+  if (!codesResult.ok) return codesResult;
+  if (codesResult.codes.length === 0) {
+    return { ok: false, error: "No retailer stock codes saved yet" };
   }
 
-  const supabase = supabaseAdmin();
-  const { data: codes, error: codesErr } = await supabase
-    .from("ingredient_retailer_codes")
-    .select("ingredient_id, retailer, stock_code");
-  if (codesErr) return { ok: false, error: codesErr.message };
-
-  const codeRows = codes ?? [];
-  if (codeRows.length === 0) {
-    return {
-      ok: true,
-      totals: { requested: 0, products: 0, notes: 0, updated: 0, outOfStock: 0 },
-      durationMs: Date.now() - started,
-    };
-  }
-
-  // Build lookup: "retailer:stock_code" -> { ingredient_id, retailer,
-  // stock_code }. The actor accepts a mixed productIds list with
-  // retailer:id prefixes so one call covers every retailer, and the
-  // ingredient_prices PK is now (ingredient_id, retailer, stock_code) so
-  // we track every variant separately.
-  type CodeRef = {
-    ingredient_id: string;
-    retailer: Retailer;
-    stock_code: string;
-  };
-  const ingredientLookup = new Map<string, CodeRef>();
   const retailerSet = new Set<Retailer>();
   const productIds: string[] = [];
-  for (const row of codeRows) {
-    const retailer = row.retailer as Retailer;
-    const key = `${retailer}:${row.stock_code}`;
-    ingredientLookup.set(key, {
-      ingredient_id: row.ingredient_id,
-      retailer,
-      stock_code: row.stock_code,
-    });
-    retailerSet.add(retailer);
-    productIds.push(key);
+  for (const row of codesResult.codes) {
+    retailerSet.add(row.retailer);
+    productIds.push(`${row.retailer}:${row.stock_code}`);
   }
 
-  const body = {
+  const input = {
     retailers: Array.from(retailerSet),
     productIds,
     postalCodes: [postcode],
@@ -169,16 +167,34 @@ export async function refreshPrices(): Promise<RefreshResult> {
     includeDetails: false,
   };
 
-  const url = `https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(
-    token,
-  )}`;
+  // Apify wants ad-hoc webhooks as a base64-encoded JSON array passed
+  // as the `webhooks` query parameter on the run endpoint. Fire on
+  // SUCCEEDED and FAILED so we can log failures too.
+  const webhookConfig = [
+    {
+      eventTypes: ["ACTOR.RUN.SUCCEEDED", "ACTOR.RUN.FAILED"],
+      requestUrl: webhookUrl,
+      payloadTemplate: JSON.stringify({
+        runId: "{{resource.id}}",
+        datasetId: "{{resource.defaultDatasetId}}",
+        status: "{{resource.status}}",
+      }),
+    },
+  ];
+  const webhooksB64 = Buffer.from(JSON.stringify(webhookConfig)).toString(
+    "base64",
+  );
 
-  let rows: DatasetRow[] = [];
+  const url =
+    `https://api.apify.com/v2/acts/${APIFY_ACTOR}/runs` +
+    `?token=${encodeURIComponent(token)}` +
+    `&webhooks=${encodeURIComponent(webhooksB64)}`;
+
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(input),
     });
     if (!res.ok) {
       const text = await res.text();
@@ -187,23 +203,61 @@ export async function refreshPrices(): Promise<RefreshResult> {
         error: `Apify returned ${res.status}: ${text.slice(0, 200)}`,
       };
     }
-    rows = (await res.json()) as DatasetRow[];
+    const payload = (await res.json()) as { data?: { id?: string } };
+    const runId = payload.data?.id;
+    if (!runId) {
+      return { ok: false, error: "Apify response missing run id" };
+    }
+    return { ok: true, runId, requested: codesResult.codes.length };
   } catch (e) {
     return {
       ok: false,
       error: e instanceof Error ? e.message : "Apify call failed",
     };
   }
-  const errors: string[] = [];
+}
 
-  // Index results by (retailer, productId) so we can match back to codes.
-  // The actor:
-  //  - returns NOTE rows for out-of-stock items with recordType="NOTE";
-  //  - returns regular product rows WITHOUT a recordType field at all
-  //    (so we default to PRODUCT when it's missing);
-  //  - returns retailer in title case ("Coles" / "Woolworths") — we
-  //    lowercase to match our "coles:..." / "woolworths:..." keys;
-  //  - sometimes omits productId — we fall back to parsing the URL.
+// Fetch a finished run's dataset items, parse them, and upsert into
+// ingredient_prices. Called from the Apify webhook handler.
+export async function processApifyDataset(
+  datasetId: string,
+): Promise<ProcessResult> {
+  const started = Date.now();
+  const token = process.env.APIFY_TOKEN;
+  if (!token) return { ok: false, error: "APIFY_TOKEN env var not set" };
+
+  const codesResult = await loadCodes();
+  if (!codesResult.ok) return codesResult;
+
+  const ingredientLookup = new Map<string, CodeRef>();
+  for (const row of codesResult.codes) {
+    ingredientLookup.set(`${row.retailer}:${row.stock_code}`, row);
+  }
+
+  const datasetUrl =
+    `https://api.apify.com/v2/datasets/${datasetId}/items` +
+    `?token=${encodeURIComponent(token)}&clean=true`;
+  let rows: DatasetRow[] = [];
+  try {
+    const res = await fetch(datasetUrl, { method: "GET" });
+    if (!res.ok) {
+      const text = await res.text();
+      return {
+        ok: false,
+        error: `Apify dataset fetch ${res.status}: ${text.slice(0, 200)}`,
+      };
+    }
+    rows = (await res.json()) as DatasetRow[];
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Dataset fetch failed",
+    };
+  }
+
+  // Index results by (retailer, productId). See earlier notes on actor
+  // quirks: recordType omitted for products, retailer may be title-cased
+  // with trailing words, productId sometimes missing (derive from URL).
   const resultByKey = new Map<string, DatasetRow>();
   let products = 0;
   let notes = 0;
@@ -225,10 +279,6 @@ export async function refreshPrices(): Promise<RefreshResult> {
     resultByKey.set(key, row);
   }
 
-  // Upsert prices + count out-of-stocks. One row per (ingredient, retailer,
-  // stock_code) so we capture every variant.
-  let updated = 0;
-  let outOfStock = 0;
   const upserts: {
     ingredient_id: string;
     retailer: Retailer;
@@ -247,22 +297,16 @@ export async function refreshPrices(): Promise<RefreshResult> {
     fetched_at: string;
   }[] = [];
   const nowIso = new Date().toISOString();
+  let outOfStock = 0;
   for (const [key, ref] of ingredientLookup) {
     const match = resultByKey.get(key) ?? null;
-    // Treat anything other than a NOTE as a product row (actor omits
-    // recordType for regular results).
     const isProduct = !!match && match.recordType !== "NOTE";
-    const inStock =
-      isProduct && (match?.inStock ?? true) !== false;
+    const inStock = isProduct && (match?.inStock ?? true) !== false;
     if (!inStock) outOfStock++;
     const unitPriceCents =
       isProduct && match?.unitPrice != null
         ? toCents(match.unitPrice as number)
         : null;
-    // actor emits "1kg" / "100g" / "1L" etc. — strip a bare leading "1"
-    // ("1kg" → "kg") so the display + comparator can group by "kg"
-    // vs "100g" cleanly. The negative lookahead keeps "100g" intact —
-    // the old regex was gobbling the 1 off "100g", leaving "00g".
     const rawUnitOfMeasure =
       isProduct && match?.unitOfMeasure ? String(match.unitOfMeasure) : null;
     const unitOfMeasure = rawUnitOfMeasure
@@ -290,7 +334,9 @@ export async function refreshPrices(): Promise<RefreshResult> {
     });
   }
 
+  let updated = 0;
   if (upserts.length > 0) {
+    const supabase = supabaseAdmin();
     const { error: upsertErr } = await supabase
       .from("ingredient_prices")
       .upsert(upserts, { onConflict: "ingredient_id,retailer,stock_code" });
@@ -301,13 +347,12 @@ export async function refreshPrices(): Promise<RefreshResult> {
   return {
     ok: true,
     totals: {
-      requested: codeRows.length,
+      requested: codesResult.codes.length,
       products,
       notes,
       updated,
       outOfStock,
     },
     durationMs: Date.now() - started,
-    ...(errors.length > 0 ? { warnings: errors } : {}),
   };
 }

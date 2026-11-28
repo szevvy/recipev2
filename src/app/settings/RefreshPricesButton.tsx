@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { RefreshCcw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { BOOTSTRAP_KEY } from "@/lib/queries";
+import { BOOTSTRAP_KEY, type BootstrapData } from "@/lib/queries";
 import { refreshPricesAction, type RefreshPricesResult } from "./actions";
+
+type WaitingState =
+  | { kind: "idle" }
+  | { kind: "waiting"; triggeredAt: number; referenceIso: string | null; runId: string }
+  | { kind: "done"; runId: string; finishedIso: string }
+  | { kind: "timeout" }
+  | { kind: "error"; message: string };
 
 export function RefreshPricesButton({
   initialLastRefreshedAt,
@@ -12,23 +19,72 @@ export function RefreshPricesButton({
   initialLastRefreshedAt: string | null;
 }) {
   const [pending, startTransition] = useTransition();
-  const [result, setResult] = useState<RefreshPricesResult | null>(null);
+  const [state, setState] = useState<WaitingState>({ kind: "idle" });
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(
     initialLastRefreshedAt,
   );
   const qc = useQueryClient();
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function clearTimers() {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    if (timeoutTimerRef.current) {
+      clearTimeout(timeoutTimerRef.current);
+      timeoutTimerRef.current = null;
+    }
+  }
+
+  useEffect(() => clearTimers, []);
+
+  function latestFetchedAt(): string | null {
+    const bootstrap = qc.getQueryData<BootstrapData>(BOOTSTRAP_KEY);
+    const rows = bootstrap?.prices ?? [];
+    let best: string | null = null;
+    for (const r of rows) {
+      if (!best || r.fetched_at > best) best = r.fetched_at;
+    }
+    return best;
+  }
 
   function onClick() {
-    setResult(null);
+    clearTimers();
+    setState({ kind: "idle" });
     startTransition(async () => {
-      const r = await refreshPricesAction();
-      setResult(r);
-      if (r.ok) {
-        setLastRefreshedAt(new Date().toISOString());
-        qc.invalidateQueries({ queryKey: BOOTSTRAP_KEY });
+      const r: RefreshPricesResult = await refreshPricesAction();
+      if (!r.ok) {
+        setState({ kind: "error", message: r.error });
+        return;
       }
+      const referenceIso = latestFetchedAt();
+      const triggeredAt = Date.now();
+      setState({ kind: "waiting", triggeredAt, referenceIso, runId: r.runId });
+
+      // Poll bootstrap every 8s for up to 3 minutes. When the newest
+      // fetched_at is strictly greater than the pre-trigger reference,
+      // we know the webhook has written and the UI can stop waiting.
+      pollTimerRef.current = setInterval(async () => {
+        await qc.refetchQueries({ queryKey: BOOTSTRAP_KEY });
+        const newest = latestFetchedAt();
+        if (newest && (!referenceIso || newest > referenceIso)) {
+          clearTimers();
+          setLastRefreshedAt(newest);
+          setState({ kind: "done", runId: r.runId, finishedIso: newest });
+        }
+      }, 8_000);
+      timeoutTimerRef.current = setTimeout(() => {
+        clearTimers();
+        setState((prev) =>
+          prev.kind === "waiting" ? { kind: "timeout" } : prev,
+        );
+      }, 180_000);
     });
   }
+
+  const busy = pending || state.kind === "waiting";
 
   return (
     <div className="space-y-2">
@@ -36,49 +92,33 @@ export function RefreshPricesButton({
         <button
           type="button"
           onClick={onClick}
-          disabled={pending}
+          disabled={busy}
           className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] text-sm px-4 py-2 hover:bg-[var(--surface-muted)] disabled:opacity-60 transition-colors"
         >
-          <RefreshCcw size={14} className={pending ? "animate-spin" : ""} />
-          {pending ? "Fetching prices…" : "Refresh prices now"}
+          <RefreshCcw size={14} className={busy ? "animate-spin" : ""} />
+          {busy ? "Refreshing prices…" : "Refresh prices now"}
         </button>
         <LastRefreshedLabel iso={lastRefreshedAt} />
       </div>
-      {result && !result.ok && (
-        <p className="text-xs text-red-600">Error: {result.error}</p>
-      )}
-      {result && result.ok && (
-        <>
-          <p className="text-xs text-[var(--muted)]">
-            Checked {result.totals.requested} product
-            {result.totals.requested === 1 ? "" : "s"}
-            {" · "}
-            {result.totals.updated} price
-            {result.totals.updated === 1 ? "" : "s"} saved
-            {result.totals.outOfStock > 0 && (
-              <>
-                {" · "}
-                <span className="text-amber-700">
-                  {result.totals.outOfStock} out of stock
-                </span>
-              </>
-            )}
-            {" · "}
-            <span className="italic">took {(result.durationMs / 1000).toFixed(1)}s</span>
-          </p>
-          {result.warnings && result.warnings.length > 0 && (
-            <ul className="text-xs text-amber-700 list-disc list-inside space-y-0.5">
-              {result.warnings.map((w, i) => (
-                <li key={i}>{w}</li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-      {pending && (
+      {state.kind === "waiting" && (
         <p className="text-xs italic text-[var(--muted)]">
-          Apify usually takes 30–60 seconds for a full run — hang tight.
+          Apify run started — polling for the result. Usually completes
+          in 30–60 seconds; checking every 8s.
         </p>
+      )}
+      {state.kind === "done" && (
+        <p className="text-xs text-[var(--sage)]">
+          Prices refreshed.
+        </p>
+      )}
+      {state.kind === "timeout" && (
+        <p className="text-xs text-amber-700">
+          Still running after 3 minutes — the webhook may land soon.
+          Reload the page later to see the latest timestamp.
+        </p>
+      )}
+      {state.kind === "error" && (
+        <p className="text-xs text-red-600">Error: {state.message}</p>
       )}
     </div>
   );

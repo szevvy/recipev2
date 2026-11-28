@@ -349,6 +349,21 @@ export async function setMealSkipShoppingAction(
     .eq("id", mealPlanId);
   if (updErr) return { ok: false, error: updErr.message };
 
+  // When skipping, actively delete the source rows tying any shopping
+  // items back to this meal — otherwise cleanupOrphanMealItems sees
+  // the stale sources and thinks the shopping_items are still "live",
+  // and the ingredients never disappear from the shopping list.
+  // Un-skipping doesn't need this: the sync pass rebuilds meal-source
+  // rows for every active meal.
+  if (skip) {
+    const { error: delSrcErr } = await supabase
+      .from("shopping_item_sources")
+      .delete()
+      .eq("kind", "meal")
+      .eq("meal_plan_id", mealPlanId);
+    if (delSrcErr) return { ok: false, error: delSrcErr.message };
+  }
+
   // Re-run sync so the shopping list reflects the change. When skipping,
   // this meal's items are filtered out and cleanupOrphanMealItems will
   // sweep orphans whose only source was this meal.

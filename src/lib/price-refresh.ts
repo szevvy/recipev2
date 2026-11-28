@@ -170,15 +170,17 @@ export async function kickoffPriceRefresh(
   // Apify wants ad-hoc webhooks as a base64-encoded JSON array passed
   // as the `webhooks` query parameter on the run endpoint. Fire on
   // SUCCEEDED and FAILED so we can log failures too.
+  //
+  // Payload template uses whole-object substitution for `resource` —
+  // that's the pattern from Apify's own docs and avoids any ambiguity
+  // about property drilling in their templating engine. The webhook
+  // handler extracts the fields it needs from the resource object.
   const webhookConfig = [
     {
       eventTypes: ["ACTOR.RUN.SUCCEEDED", "ACTOR.RUN.FAILED"],
       requestUrl: webhookUrl,
-      payloadTemplate: JSON.stringify({
-        runId: "{{resource.id}}",
-        datasetId: "{{resource.defaultDatasetId}}",
-        status: "{{resource.status}}",
-      }),
+      payloadTemplate:
+        '{"eventType":"{{eventType}}","resource":{{resource}}}',
     },
   ];
   const webhooksB64 = Buffer.from(JSON.stringify(webhookConfig)).toString(

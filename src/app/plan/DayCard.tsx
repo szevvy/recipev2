@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
-import { ChefHat, ChevronDown, PencilLine, Plus, X } from "lucide-react";
+import {
+  ChefHat,
+  ChevronDown,
+  PencilLine,
+  Plus,
+  ShoppingCart,
+  X,
+} from "lucide-react";
 import { format, isToday, isPast } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import type {
@@ -20,6 +27,7 @@ import {
   clearMealAction,
   setCustomMealAction,
   setMealAction,
+  setMealSkipShoppingAction,
   type CustomMealIngredientInput,
 } from "./actions";
 import { RecipeModal } from "./RecipeModal";
@@ -111,6 +119,7 @@ export function DayCard({
       servings: previous?.servings ?? null,
       slot: null,
       shopped_at: null,
+      skip_shopping: previous?.skip_shopping ?? false,
       created_at: previous?.created_at ?? new Date().toISOString(),
       recipes: {
         id: recipe.id,
@@ -157,6 +166,7 @@ export function DayCard({
       servings: null,
       slot: null,
       shopped_at: null,
+      skip_shopping: previous?.skip_shopping ?? false,
       created_at: previous?.created_at ?? new Date().toISOString(),
       recipes: null,
       meal_plan_custom_ingredients: rows.map((r, idx) => {
@@ -224,6 +234,33 @@ export function DayCard({
     });
   }
 
+  function toggleSkipShopping() {
+    const previous = mealLocal;
+    if (!previous) return;
+    const next: MealPlanWithRecipe = {
+      ...previous,
+      skip_shopping: !previous.skip_shopping,
+    };
+    setMealLocal(next);
+    patchMealCaches(next);
+    setError(null);
+    startTransition(async () => {
+      const result = await setMealSkipShoppingAction(
+        previous.id,
+        next.skip_shopping,
+      );
+      if (!result.ok) {
+        setMealLocal(previous);
+        patchMealCaches(previous);
+        setError(result.error);
+        return;
+      }
+      // Sync ran server-side (ingredients added or swept); bootstrap
+      // refresh picks up the resulting shopping_items.
+      invalidate();
+    });
+  }
+
   function openMealAction() {
     if (isCustom) {
       setEditingCustom(true);
@@ -256,15 +293,26 @@ export function DayCard({
               )}
             </div>
           </div>
-          {mealLocal && (
-            <button
-              onClick={clear}
-              title="Remove meal"
-              className="p-1 rounded-full text-[var(--muted)] hover:text-red-600 hover:bg-red-50 transition-colors"
-            >
-              <X size={14} />
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {mealLocal?.skip_shopping && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] text-amber-900"
+                title="Not on the shopping list — toggle in ingredients"
+              >
+                <ShoppingCart size={10} />
+                not shopping
+              </span>
+            )}
+            {mealLocal && (
+              <button
+                onClick={clear}
+                title="Remove meal"
+                className="p-1 rounded-full text-[var(--muted)] hover:text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
         </div>
 
         {mealLocal ? (
@@ -343,15 +391,26 @@ export function DayCard({
           </div>
         )}
         {expanded && mealIngredients.length > 0 && mealLocal && (
-          <ul className="border-t border-[var(--border)]/60 pt-2 space-y-0.5">
-            {mealIngredients.map((view) => (
-              <MealIngredientRow
-                key={view.key}
-                view={view}
-                mealId={mealLocal.id}
+          <div className="border-t border-[var(--border)]/60 pt-2 space-y-1">
+            <label className="flex items-center gap-2 text-xs text-[var(--muted)] cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={!mealLocal.skip_shopping}
+                onChange={toggleSkipShopping}
+                className="h-3.5 w-3.5 accent-[var(--accent)]"
               />
-            ))}
-          </ul>
+              <span>Shop for this meal</span>
+            </label>
+            <ul className="space-y-0.5">
+              {mealIngredients.map((view) => (
+                <MealIngredientRow
+                  key={view.key}
+                  view={view}
+                  mealId={mealLocal.id}
+                />
+              ))}
+            </ul>
+          </div>
         )}
         {mealLocal &&
           mealIngredients

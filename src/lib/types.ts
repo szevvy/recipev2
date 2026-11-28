@@ -82,6 +82,9 @@ export type MealPlanEntry = {
   servings: number | null;
   slot: string | null;
   shopped_at: string | null;
+  // When true, syncShoppingList excludes this meal's ingredients.
+  // Different from shopped_at (already bought). Default false.
+  skip_shopping: boolean;
   created_at: string;
 };
 

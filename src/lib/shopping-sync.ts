@@ -14,6 +14,8 @@ import type { ShoppingItemState } from "./types";
 //  * Rows with state='not_checked' or 'to_buy' and source='meal' are refreshed
 //    from the current (unshopped) meal plan: quantity gets re-merged.
 //  * Meals with shopped_at IS NOT NULL are skipped (already shopped-for).
+//  * Meals with skip_shopping=true are also skipped (user opted out of
+//    shopping for them — eating out / already have everything / etc.).
 //  * Each merged (ingredient_id, unit) bucket maps to one shopping_items row,
 //    keyed by (ingredient_id, source='meal', unit_key).
 //  * Orphan rows (unmatched to the new merged list AND no sources) get deleted.
@@ -28,12 +30,13 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
     supabase
       .from("meal_plan")
       .select(
-        "id, date, servings, shopped_at, " +
+        "id, date, servings, shopped_at, skip_shopping, " +
           "recipes(id, default_servings, recipe_ingredients(ingredient_id, quantity)), " +
           "meal_plan_custom_ingredients(ingredient_id, quantity)",
       )
       .gte("date", today)
-      .is("shopped_at", null),
+      .is("shopped_at", null)
+      .eq("skip_shopping", false),
     supabase
       .from("shopping_items")
       .select("id, ingredient_id, quantity, state, unit_key")
@@ -55,6 +58,7 @@ export async function syncShoppingList(): Promise<{ ok: true } | { ok: false; er
     date: string;
     servings: number | null;
     shopped_at: string | null;
+    skip_shopping: boolean;
     recipes: {
       id: string;
       default_servings: number;

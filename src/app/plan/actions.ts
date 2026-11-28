@@ -335,6 +335,30 @@ async function clearCustomSideEffects(supabase: Supa, mealPlanId: string): Promi
   await supabase.from("shopping_items").delete().in("id", toDelete);
 }
 
+// Opt a meal out of (or back into) the shopping list. When skip=true we
+// also sweep any shopping_items that were created from this meal so
+// they disappear immediately. When skip=false we resync so items land.
+export async function setMealSkipShoppingAction(
+  mealPlanId: string,
+  skip: boolean,
+): Promise<ActionResult> {
+  const supabase = supabaseAdmin();
+  const { error: updErr } = await supabase
+    .from("meal_plan")
+    .update({ skip_shopping: skip })
+    .eq("id", mealPlanId);
+  if (updErr) return { ok: false, error: updErr.message };
+
+  // Re-run sync so the shopping list reflects the change. When skipping,
+  // this meal's items are filtered out and cleanupOrphanMealItems will
+  // sweep orphans whose only source was this meal.
+  const sync = await syncShoppingList();
+  if (!sync.ok) return sync;
+  const cleanupErr = await cleanupOrphanMealItems(supabase);
+  if (cleanupErr) return { ok: false, error: cleanupErr };
+  return { ok: true };
+}
+
 export async function clearMealAction(
   date: string,
   removeIngredients?: boolean,

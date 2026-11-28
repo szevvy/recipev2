@@ -183,6 +183,7 @@ export type Database = {
           servings?: number | null;
           slot?: string | null;
           shopped_at?: string | null;
+          skip_shopping?: boolean;
         };
         Update: {
           date?: string;
@@ -191,6 +192,7 @@ export type Database = {
           servings?: number | null;
           slot?: string | null;
           shopped_at?: string | null;
+          skip_shopping?: boolean;
         };
         Relationships: [];
       };

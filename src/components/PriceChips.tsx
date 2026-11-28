@@ -351,33 +351,17 @@ function pickDisplay(groups: ChipGroup[], variant: ChipVariant): DisplayGroup[] 
   if (inStock.length === 0) return [];
   if (inStock.length === 1) {
     // Either a single retailer or multiple at the same price — the
-    // priceLabel usually offers no decision value, hide it. Exception:
-    // keep the price visible when it's on sale so the user knows what
-    // the special is (useful when both retailers run the same sale).
+    // priceLabel offers no decision value, hide it. Exception: keep
+    // the price visible when it's on sale so the user knows what the
+    // special is.
     const g = inStock[0];
     return [{ ...g, showPrice: g.onSale }];
   }
-  const cheapest = inStock.find((g) => g.cheapest) ?? inStock[0];
-  const otherGroups = inStock.filter((g) => g !== cheapest);
-  const display: DisplayGroup[] = [{ ...cheapest, showPrice: true }];
-  if (otherGroups.length > 0) {
-    // Icon-only "also available at" chip so the user still sees
-    // which retailers stock the item (handy if they're already at
-    // one of the more expensive stores and want to save a trip).
-    const otherRetailers = otherGroups.flatMap((g) => g.retailers);
-    display.push({
-      key: `others:${otherRetailers.map((r) => r.retailer).join(",")}`,
-      retailers: otherRetailers,
-      priceLabel: "",
-      regularLabel: null,
-      cheapest: false,
-      outOfStock: false,
-      onSale: false,
-      title: otherGroups.map((g) => g.title).join("\n\n"),
-      showPrice: false,
-    });
-  }
-  return display;
+  // Multiple groups at different prices — render all of them with
+  // their prices. Cheapest keeps its sage-green highlight; the more
+  // expensive ones sit beside it in muted text so the user can weigh
+  // "worth a detour or not?" without opening the row.
+  return inStock.map((g) => ({ ...g, showPrice: true }));
 }
 
 export function PriceChips({

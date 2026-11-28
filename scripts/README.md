@@ -1,7 +1,7 @@
 # scripts/
 
 Standalone Node scripts meant to run outside Vercel. They talk to the
-same Supabase instance via its REST API with the service_role key.
+deployed app via a shared-secret API — no Supabase creds on the box.
 
 ## Why they exist
 
@@ -11,21 +11,42 @@ datacenter IP range** (and from other datacenter IPs generally). It
 accepts requests from a residential connection, so we run the weight
 scrape on a Linux box at home instead of shoehorning it into Vercel.
 
+## How it works
+
+```
+┌─────────────┐  GET /api/weights/pending   ┌───────────────┐
+│             │ ───────────────────────────▶│               │
+│   Vercel    │  returns (ingredient_id,    │  Home Linux   │
+│  (Supabase  │           stock_code)[]      │     box       │
+│   behind)   │                              │               │
+│             │ ◀─ hits Woolies product API ◀┤               │
+│             │                              │               │
+│             │  POST /api/weights/submit    │               │
+│             │ ◀────────────────────────────┤               │
+│             │  body: {ingredient_id,       │               │
+│             │         unit_weight_g}[]     │               │
+│             │  Vercel upserts to Supabase  │               │
+└─────────────┘                              └───────────────┘
+```
+
+Both endpoints are gated by a bearer token (`WEIGHTS_API_TOKEN`) that's
+set in both Vercel's env and the box's env.
+
 ## `refresh-weights.mjs`
 
 One-shot script:
 
-1. Pulls every ingredient with `auto_fetch_weight=true` from Supabase.
-2. Looks up each one's Woolworths stock codes.
-3. Primes a Woolies session (walks redirects collecting cookies).
-4. Fetches `UnitWeightInGrams` per code from the product-detail endpoint.
-5. Upserts into `ingredient_retailer_weights(ingredient_id, retailer='woolworths', unit_weight_g, updated_at)`.
+1. `GET /api/weights/pending` from Vercel — gets the opt-in list.
+2. Primes a Woolies session (walks redirects collecting cookies).
+3. `GET https://www.woolworths.com.au/apis/ui/product/detail/<code>`
+   per code, extracts `UnitWeightInGrams`.
+4. `POST /api/weights/submit` to Vercel with the collected weights.
 
-Required env vars:
+Required env vars on the box:
 
 ```
-SUPABASE_URL=https://xyzabc.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<service_role key from Supabase settings>
+VERCEL_API_URL=https://homerecipebook.vercel.app
+WEIGHTS_API_TOKEN=<the shared secret, also set in Vercel>
 ```
 
 Run once:
@@ -34,15 +55,15 @@ Run once:
 node /opt/recipe-weights/refresh-weights.mjs
 ```
 
-Returns JSON totals on stdout and exits non-zero on failure.
+Returns JSON totals on stdout, exits non-zero on failure.
 
 ## `weights-server.mjs`
 
 Thin HTTP wrapper so you can:
 
-- Trigger a refresh from a browser / `curl` on the LAN
-  (`curl http://192.168.1.80:3100/refresh`).
-- Point a cron job (or `systemd` timer) at `GET /refresh` and let it run weekly.
+- Trigger a refresh ad-hoc:
+  `curl http://192.168.1.80:3100/refresh`.
+- Point `systemd`'s timer at `GET /refresh` on a weekly schedule.
 
 Optional env:
 
@@ -54,13 +75,12 @@ REFRESH_TOKEN=some-string # when set, /refresh requires ?token=some-string
 Routes:
 
 - `GET /health` — always returns `{ok: true}`.
-- `GET /refresh` — runs the fetch + upsert, returns the JSON result from
-  `refresh-weights.mjs`. Add `?token=…` if `REFRESH_TOKEN` is set.
+- `GET /refresh` — runs the fetch + submit, returns the result JSON.
 
 ## Deployment on a home Linux box
 
-The scripts have **no dependencies**. Just copy the two `.mjs` files and
-set env vars. Node 20+ required.
+Zero dependencies. Copy the two `.mjs` files and set env vars.
+Requires Node 20+.
 
 ### Recommended layout
 
@@ -68,10 +88,10 @@ set env vars. Node 20+ required.
 /opt/recipe-weights/
   refresh-weights.mjs
   weights-server.mjs
-  .env                 # SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, REFRESH_TOKEN
+  .env                  # VERCEL_API_URL, WEIGHTS_API_TOKEN, REFRESH_TOKEN
 ```
 
-### systemd unit (recommended)
+### systemd service — HTTP server
 
 `/etc/systemd/system/weights-server.service`:
 
@@ -98,16 +118,47 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now weights-server
 ```
 
-### Scheduled refresh (crontab)
+### systemd timer — weekly refresh
 
-Weekly, Wednesday 7am local — half an hour after Vercel's price refresh
-lands:
+`/etc/systemd/system/weights-refresh.service`:
 
-```cron
-0 7 * * 3  curl -fsS "http://127.0.0.1:3100/refresh?token=$REFRESH_TOKEN" -o /tmp/weights.log
+```ini
+[Unit]
+Description=Trigger weekly Woolies weight refresh
+After=weights-server.service
+Requires=weights-server.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/recipe-weights/.env
+ExecStart=/usr/bin/curl -fsS "http://127.0.0.1:3100/refresh?token=${REFRESH_TOKEN}" -o /tmp/weights.log
 ```
 
-Or with `systemd`'s own timer, `/etc/systemd/system/weights-server-refresh.service` + `.timer` that calls `curl` the same way.
+`/etc/systemd/system/weights-refresh.timer`:
+
+```ini
+[Unit]
+Description=Weekly Woolies weight refresh (Wed 7am local)
+
+[Timer]
+OnCalendar=Wed 07:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now weights-refresh.timer
+```
+
+Check it:
+
+```bash
+systemctl list-timers weights-refresh.timer
+journalctl -u weights-refresh.service -e
+```
 
 ### Manual trigger from your phone / another machine
 

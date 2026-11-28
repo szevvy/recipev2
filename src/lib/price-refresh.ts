@@ -1,7 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "./supabase";
 import { getSettings } from "./settings";
-import { fetchWoolworthsWeights } from "./woolworths-weights";
 import type { Retailer } from "./types";
 
 // vant47/australian-supermarket-prices-scraper actor on Apify.
@@ -347,9 +346,10 @@ export async function processApifyDataset(
     updated = upserts.length;
   }
 
-  // Auto-fetch Woolworths UnitWeightInGrams for ingredients that opted in.
-  // Gives us a $/kg for per-each produce without manual entry.
-  await refreshAutoFetchedWeights(supabase);
+  // Note: Woolworths UnitWeightInGrams auto-fetch is not done here.
+  // Woolies blocks Vercel's datacenter IPs (403). The weight refresh
+  // runs on a local Linux box via scripts/refresh-weights.mjs — see
+  // scripts/README.md.
 
   return {
     ok: true,
@@ -364,70 +364,3 @@ export async function processApifyDataset(
   };
 }
 
-async function refreshAutoFetchedWeights(
-  supabase: ReturnType<typeof supabaseAdmin>,
-): Promise<void> {
-  const { data: optedIn, error } = await supabase
-    .from("ingredients")
-    .select("id")
-    .eq("auto_fetch_weight", true);
-  if (error) {
-    console.warn(`[ww weights] opted-in query failed: ${error.message}`);
-    return;
-  }
-  if (!optedIn || optedIn.length === 0) {
-    console.log("[ww weights] no ingredients opted in; skipping");
-    return;
-  }
-  console.log(`[ww weights] ${optedIn.length} ingredients opted in`);
-
-  const ingredientIds = optedIn.map((r) => r.id);
-  const { data: codes } = await supabase
-    .from("ingredient_retailer_codes")
-    .select("ingredient_id, stock_code")
-    .eq("retailer", "woolworths")
-    .in("ingredient_id", ingredientIds);
-  const rows = codes ?? [];
-  if (rows.length === 0) {
-    console.log("[ww weights] opted-in but no Woolies codes; skipping");
-    return;
-  }
-
-  // Map stock_code -> ingredient_id. Multiple SKUs under the same
-  // ingredient can resolve to the same weight (they're the same thing
-  // in different packs), so we just pick the first non-zero weight
-  // Woolies returns for any of this ingredient's codes.
-  const codeToIngredient = new Map<string, string>();
-  for (const row of rows) codeToIngredient.set(row.stock_code, row.ingredient_id);
-
-  const fetched = await fetchWoolworthsWeights(rows.map((r) => r.stock_code));
-  if (fetched.length === 0) {
-    console.log("[ww weights] fetcher returned nothing");
-    return;
-  }
-
-  const byIngredient = new Map<string, number>();
-  for (const { stockCode, unitWeightG } of fetched) {
-    const ingredient_id = codeToIngredient.get(stockCode);
-    if (!ingredient_id) continue;
-    if (!byIngredient.has(ingredient_id)) byIngredient.set(ingredient_id, unitWeightG);
-  }
-
-  const upserts = Array.from(byIngredient.entries()).map(
-    ([ingredient_id, unit_weight_g]) => ({
-      ingredient_id,
-      retailer: "woolworths" as const,
-      unit_weight_g,
-      updated_at: new Date().toISOString(),
-    }),
-  );
-  if (upserts.length === 0) return;
-  const { error: upErr } = await supabase
-    .from("ingredient_retailer_weights")
-    .upsert(upserts, { onConflict: "ingredient_id,retailer" });
-  if (upErr) {
-    console.warn(`[ww weights] upsert failed: ${upErr.message}`);
-  } else {
-    console.log(`[ww weights] upserted ${upserts.length} weight(s)`);
-  }
-}

@@ -147,6 +147,7 @@ export function ShoppingItemRow({
             retailer_codes: { coles: [], woolworths: [], aldi: [] },
             retailer_weights: { coles: null, woolworths: null, aldi: null },
             price_display_override: null,
+            auto_fetch_weight: false,
             staple_state: "not_checked",
             created_at: nowIso,
             updated_at: nowIso,

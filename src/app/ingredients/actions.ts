@@ -29,6 +29,7 @@ export async function createIngredientAction(fd: FormData): Promise<ActionResult
         linked_recipe_id: input.linked_recipe_id ?? null,
         shelf_life_days: input.shelf_life_days ?? null,
         price_display_override: input.price_display_override,
+        auto_fetch_weight: input.auto_fetch_weight,
       })
       .select("id")
       .single();
@@ -99,6 +100,7 @@ export async function updateIngredientAction(id: string, fd: FormData): Promise<
         linked_recipe_id: input.linked_recipe_id ?? null,
         shelf_life_days: input.shelf_life_days ?? null,
         price_display_override: input.price_display_override,
+        auto_fetch_weight: input.auto_fetch_weight,
       })
       .eq("id", id);
     if (error) {

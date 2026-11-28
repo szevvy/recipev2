@@ -36,6 +36,7 @@ type IngredientInsert = {
   linked_recipe_id?: string | null;
   shelf_life_days?: number | null;
   price_display_override?: "pack" | "per_kg" | "both" | null;
+  auto_fetch_weight?: boolean;
   staple_state?: StapleState;
 };
 

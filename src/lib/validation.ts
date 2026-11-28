@@ -82,6 +82,16 @@ export const IngredientInputSchema = z.object({
       if (t === "pack" || t === "per_kg" || t === "both") return t;
       return null;
     }),
+  // Checkbox: pull Woolies's UnitWeightInGrams on each refresh.
+  auto_fetch_weight: z
+    .union([z.string(), z.boolean(), z.null()])
+    .optional()
+    .transform((v) => {
+      if (v == null) return false;
+      if (typeof v === "boolean") return v;
+      const t = v.trim().toLowerCase();
+      return t === "on" || t === "true" || t === "1";
+    }),
 });
 
 function parseWeightG(raw: string | null | undefined): number | null {
@@ -142,6 +152,7 @@ export function parseIngredientForm(fd: FormData): IngredientInput {
       aldi: String(fd.get("weight_g_aldi") ?? ""),
     },
     price_display_override: String(fd.get("price_display_override") ?? ""),
+    auto_fetch_weight: String(fd.get("auto_fetch_weight") ?? ""),
   };
   return IngredientInputSchema.parse(raw);
 }

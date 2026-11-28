@@ -40,6 +40,11 @@ export type Ingredient = {
   };
   // Null → inherit from category_meta[group_name].price_display.
   price_display_override: PriceDisplay | null;
+  // When true, each price refresh also calls Woolies's product-detail
+  // API for this ingredient's Woolies stock codes and writes the
+  // returned UnitWeightInGrams into ingredient_retailer_weights. Lets
+  // us derive $/kg for per-each produce without manual weight entry.
+  auto_fetch_weight: boolean;
   staple_state: StapleState;
   created_at: string;
   updated_at: string;
